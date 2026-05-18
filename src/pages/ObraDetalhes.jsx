@@ -20,7 +20,7 @@ export default function ObraDetalhes() {
     formatCurrency
   } = useAppContext();
 
-  const obra = obras.find(o => o.id === parseInt(id));
+  const obra = obras.find(o => o.id === id);
   const [aba, setAba] = useState('resumo');
   const [isGastoModal, setIsGastoModal] = useState(false);
   const [descGasto, setDescGasto] = useState('');
@@ -38,8 +38,8 @@ export default function ObraDetalhes() {
   const propostasDaObra = getPropostaObra(id);
   const propostaPrincipal = propostasDaObra[0] || null;
   const progressoCrono = cronograma.length > 0 ? Math.round(cronograma.reduce((a, e) => a + e.progresso, 0) / cronograma.length) : 0;
-  const equipeObra = funcionarios.filter(f => f.obraAtualId === parseInt(id));
-  const funcionariosSemObra = funcionarios.filter(f => !f.obraAtualId || f.obraAtualId !== parseInt(id));
+  const equipeObra = funcionarios.filter(f => f.obraAtualId === id);
+  const funcionariosSemObra = funcionarios.filter(f => !f.obraAtualId || f.obraAtualId !== id);
 
   const handleAddGasto = (e) => {
     e.preventDefault();
@@ -203,7 +203,7 @@ export default function ObraDetalhes() {
                         {obraAtual && <p style={{ fontSize: 11, color: 'var(--warning-text)' }}>Atualmente em: {obraAtual.nome}</p>}
                         {!f.obraAtualId && <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Sem alocação</p>}
                       </div>
-                      <button className="btn btn-primary btn-sm" onClick={() => updateFuncionario(f.id, 'obraAtualId', parseInt(id))}>
+                      <button className="btn btn-primary btn-sm" onClick={() => updateFuncionario(f.id, 'obraAtualId', id)}>
                         <UserPlus size={14} /> Alocar
                       </button>
                     </div>
