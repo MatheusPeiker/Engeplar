@@ -67,7 +67,13 @@ export default function Proposta() {
 
   const handleVincularOrcamento = (orcId) => {
     handleUpdate('orcamentoId', orcId || null);
-    if (orcId) preencherMobDestino(orcId, proposta?.clienteEndereco);
+    if (!orcId) return;
+    const orc = listaOrcamentos.find(o => o.id === orcId);
+    const cli = orc?.extras?.cliente || {};
+    if (cli.cnpj) handleUpdate('clienteCnpj', cli.cnpj);
+    if (cli.nome) handleUpdate('clienteNome', cli.nome);
+    if (cli.endereco) handleUpdate('clienteEndereco', cli.endereco);
+    preencherMobDestino(orcId, cli.endereco || proposta?.clienteEndereco);
   };
 
   const handleCnpjSearch = async (cnpj) => {

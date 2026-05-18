@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, FileText, Download, ChevronRight, ArrowLeft, Users, Truck, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, FileText, Download, ChevronRight, ArrowLeft, Users, Truck, RefreshCw, Search, UserCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
@@ -38,12 +38,17 @@ export default function Orcamentos() {
   const [mob, setMob] = useState({});
   const [calcLoading, setCalcLoading] = useState(false);
 
+  // Cliente do orçamento
+  const [cli, setCli] = useState({});
+  const [isLoadingCnpjOrc, setIsLoadingCnpjOrc] = useState(false);
+
   const currentOrc = listaOrcamentos.find(o => o.id === currentOrcId);
   const extras = currentOrc?.extras || {};
   const maoDeObra = extras.maoDeObra || [];
 
   useEffect(() => {
     setMob(currentOrc?.extras?.mobilizacao || {});
+    setCli(currentOrc?.extras?.cliente || {});
     setAddingMO(false);
   }, [currentOrcId]);
 
@@ -113,6 +118,29 @@ export default function Orcamentos() {
       updateExtras({ ...extras, mobilizacao: newMob });
     } catch (e) { alert(e.message); }
     finally { setCalcLoading(false); }
+  };
+
+  const saveCli = (newCli) => {
+    setCli(newCli);
+    updateExtras({ ...extras, cliente: newCli });
+  };
+
+  const handleCnpjSearchOrc = async (cnpj) => {
+    const clean = cnpj.replace(/\D/g, '');
+    if (clean.length !== 14) return;
+    setIsLoadingCnpjOrc(true);
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${clean}`);
+      if (!response.ok) throw new Error('CNPJ não encontrado');
+      const data = await response.json();
+      const endereco = `${data.logradouro}, ${data.numero}${data.complemento ? ' - ' + data.complemento : ''} - ${data.bairro} - ${data.municipio}/${data.uf}`;
+      const novo = { ...cli, cnpj, nome: data.razao_social, endereco };
+      saveCli(novo);
+    } catch (err) {
+      alert('Erro ao buscar: ' + err.message);
+    } finally {
+      setIsLoadingCnpjOrc(false);
+    }
   };
 
   const handleCreateOrc = async (e) => {
@@ -362,6 +390,52 @@ export default function Orcamentos() {
 
           {/* Sidebar */}
           <div style={{ width: '100%', maxWidth: 300, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* ── Cliente ── */}
+            <div className="card" style={{ padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <UserCircle size={15} color="var(--primary)" />
+                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--primary)' }}>Cliente</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>CNPJ</label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      type="text" placeholder="00.000.000/0001-00"
+                      value={cli.cnpj || ''}
+                      onChange={e => setCli(p => ({ ...p, cnpj: e.target.value }))}
+                      onBlur={() => saveCli(cli)}
+                      style={{ ...inputSt, flex: 1 }}
+                    />
+                    <button className="btn btn-primary btn-sm" onClick={() => handleCnpjSearchOrc(cli.cnpj || '')} disabled={isLoadingCnpjOrc}>
+                      {isLoadingCnpjOrc ? '...' : <Search size={13} />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>Razão Social</label>
+                  <input
+                    type="text" placeholder="Nome do cliente"
+                    value={cli.nome || ''}
+                    onChange={e => setCli(p => ({ ...p, nome: e.target.value }))}
+                    onBlur={() => saveCli(cli)}
+                    style={inputSt}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>Endereço</label>
+                  <input
+                    type="text" placeholder="Endereço completo"
+                    value={cli.endereco || ''}
+                    onChange={e => setCli(p => ({ ...p, endereco: e.target.value }))}
+                    onBlur={() => saveCli({ ...cli, endereco: cli.endereco })}
+                    style={inputSt}
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="card" style={{ background: 'var(--primary)', color: 'white', border: 'none' }}>
               <p style={{ opacity: .8, fontSize: 13, marginBottom: 4 }}>Total Geral</p>
               <h2 style={{ fontSize: 32, fontWeight: 800 }}>{formatCurrency(grandTotal)}</h2>
