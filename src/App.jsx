@@ -20,7 +20,12 @@ import Perfil from './pages/Perfil'
 import Contatos from './pages/Contatos'
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated } = useAppContext();
+  const { isAuthenticated, authLoading } = useAppContext();
+  if (authLoading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0F172A' }}>
+      <div style={{ color: '#60A5FA', fontSize: 14 }}>Carregando...</div>
+    </div>
+  );
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
