@@ -1,13 +1,43 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Building2, Users, Mail, Phone, MapPin, Globe, Contact2 } from 'lucide-react';
+import { Building2, Users, Mail, Phone, MapPin, Globe, Contact2, Search } from 'lucide-react';
 import InlineEdit from '../components/InlineEdit';
 import Funcionarios from './Funcionarios';
 import logoImg from '../assets/logo.jpeg';
 
 export default function Perfil() {
   const [activeTab, setActiveTab] = useState('empresa');
+  const [cnpjInput, setCnpjInput] = useState('');
+  const [isLoadingCnpj, setIsLoadingCnpj] = useState(false);
   const { empresa, updateEmpresa } = useAppContext();
+
+  const handleCnpjSearch = async () => {
+    const clean = (cnpjInput || empresa.cnpj || '').replace(/\D/g, '');
+    if (clean.length !== 14) { alert('CNPJ inválido. Deve ter 14 dígitos.'); return; }
+    setIsLoadingCnpj(true);
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${clean}`);
+      if (!response.ok) throw new Error('CNPJ não encontrado');
+      const data = await response.json();
+      const endereco = [
+        data.logradouro, data.numero,
+        data.complemento ? data.complemento : null,
+        data.bairro, `${data.municipio}/${data.uf}`
+      ].filter(Boolean).join(', ');
+      await Promise.all([
+        updateEmpresa('cnpj', cnpjInput || empresa.cnpj),
+        updateEmpresa('razaoSocial', data.razao_social),
+        updateEmpresa('nomeFantasia', data.nome_fantasia || data.razao_social),
+        updateEmpresa('endereco', endereco),
+        data.ddd_telefone_1 && updateEmpresa('telefone', data.ddd_telefone_1.trim()),
+        data.email && updateEmpresa('email', data.email.toLowerCase()),
+      ].filter(Boolean));
+    } catch (err) {
+      alert('Erro ao buscar CNPJ: ' + err.message);
+    } finally {
+      setIsLoadingCnpj(false);
+    }
+  };
   
   return (
     <div>
@@ -50,7 +80,20 @@ export default function Perfil() {
               <DataRow label="Nome Fantasia" value={empresa.nomeFantasia} onSave={(v) => updateEmpresa('nomeFantasia', v)} />
               <div style={{ display: 'flex', gap: 24 }}>
                 <div style={{ flex: 1 }}>
-                  <DataRow label="CNPJ" value={empresa.cnpj} onSave={(v) => updateEmpresa('cnpj', v)} />
+                  <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 500, textTransform: 'uppercase' }}>CNPJ</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="text"
+                      placeholder="00.000.000/0001-00"
+                      defaultValue={empresa.cnpj}
+                      onChange={e => setCnpjInput(e.target.value)}
+                      onBlur={e => updateEmpresa('cnpj', e.target.value)}
+                      style={{ flex: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 14, outline: 'none', background: 'var(--input-bg, #fff)', color: 'var(--text-primary)' }}
+                    />
+                    <button className="btn btn-primary btn-sm" onClick={handleCnpjSearch} disabled={isLoadingCnpj} title="Buscar dados pelo CNPJ">
+                      {isLoadingCnpj ? '...' : <Search size={14} />}
+                    </button>
+                  </div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <DataRow label="Insc. Estadual" value={empresa.inscricaoEstadual} onSave={(v) => updateEmpresa('inscricaoEstadual', v)} />
