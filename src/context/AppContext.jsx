@@ -38,6 +38,12 @@ const norm = {
     margemLucro: r.margem_lucro ?? 20, impostos: r.impostos ?? 6,
     condicoesPagamento: r.condicoes_pagamento, valorProposto: r.valor_proposto, observacoes: r.observacoes
   }),
+  historico: (r) => ({
+    id: r.id, modulo: r.modulo, campo: r.campo,
+    anterior: r.anterior, novo: r.novo,
+    obraId: r.obra_id, entityId: r.entity_id, entityType: r.entity_type,
+    timestamp: r.created_at, desfeito: r.desfeito || false
+  }),
   cronograma: (r) => ({
     id: r.id, obraId: r.obra_id, etapa: r.etapa,
     dataInicio: r.data_inicio, dataFim: r.data_fim,
@@ -119,14 +125,14 @@ export const AppProvider = ({ children }) => {
     setObras([]); setListaOrcamentos([]); setPropostas([]);
     setCronogramas([]); setArquivos([]); setFuncionarios([]);
     setRegistrosDesempenho([]); setCatalogo([]); setTransacoes([]);
-    setCompras([]);
+    setCompras([]); setHistorico([]);
   };
 
   const loadAllData = async (uid) => {
     setDataLoading(true);
     const [
       obrasRes, clientesRes, fornRes, funcRes, orcRes, propRes,
-      cronRes, arqRes, catRes, transRes, comprasRes, despRes, empresaRes
+      cronRes, arqRes, catRes, transRes, comprasRes, despRes, empresaRes, histRes
     ] = await Promise.all([
       supabase.from('obras').select('*, gastos_despesas(*)').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('clientes').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
@@ -141,6 +147,7 @@ export const AppProvider = ({ children }) => {
       supabase.from('compras').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('registros_desempenho').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('empresa').select('*').eq('user_id', uid).maybeSingle(),
+      supabase.from('historico').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
     ]);
 
     if (obrasRes.data)    setObras(obrasRes.data.map(norm.obra));
@@ -156,6 +163,7 @@ export const AppProvider = ({ children }) => {
     if (comprasRes.data)  setCompras(comprasRes.data);
     if (despRes.data)     setRegistrosDesempenho(despRes.data.map(norm.desempenho));
     if (empresaRes.data)  setEmpresa(norm.empresa(empresaRes.data));
+    if (histRes.data)     setHistorico(histRes.data.map(norm.historico));
 
     setDataLoading(false);
   };
@@ -184,15 +192,23 @@ export const AppProvider = ({ children }) => {
     : null;
 
   // ── Histórico ─────────────────────────────────────────────
-  const registrarAlteracao = useCallback((modulo, campo, anterior, novo, obraId = null) => {
-    setHistorico(prev => [{
-      id: Date.now() + Math.random(), modulo, campo, anterior, novo, obraId,
-      timestamp: new Date().toISOString(), desfeito: false
-    }, ...prev]);
-  }, []);
-
-  const desfazerAlteracao = useCallback((altId) => {
-    setHistorico(prev => prev.map(a => a.id === altId ? { ...a, desfeito: true } : a));
+  const registrarAlteracao = useCallback((modulo, campo, anterior, novo, obraId = null, entityId = null, entityType = null) => {
+    const tempId = `hist_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const anteriorStr = anterior !== null && anterior !== undefined ? String(anterior) : null;
+    const novoStr = novo !== null && novo !== undefined ? String(novo) : null;
+    const entityIdStr = entityId ? String(entityId) : null;
+    const entry = { id: tempId, modulo, campo, anterior: anteriorStr, novo: novoStr, obraId, entityId: entityIdStr, entityType, timestamp: new Date().toISOString(), desfeito: false };
+    setHistorico(prev => [entry, ...prev]);
+    const currentUid = sessionRef.current?.user?.id;
+    if (currentUid) {
+      supabase.from('historico').insert({
+        user_id: currentUid, modulo, campo,
+        anterior: anteriorStr, novo: novoStr,
+        obra_id: obraId || null, entity_id: entityIdStr, entity_type: entityType || null,
+      }).select('id').single().then(({ data }) => {
+        if (data) setHistorico(prev => prev.map(h => h.id === tempId ? { ...h, id: data.id } : h));
+      });
+    }
   }, []);
 
   const salvarVersao = useCallback((tipo, obraId, dados, nome) => {
@@ -289,7 +305,7 @@ export const AppProvider = ({ children }) => {
 
   const updateObra = useCallback(async (obraId, campo, valor) => {
     setObras(prev => prev.map(o => {
-      if (o.id === obraId) { registrarAlteracao('Obras', campo, o[campo], valor, obraId); return { ...o, [campo]: valor }; }
+      if (o.id === obraId) { registrarAlteracao('Obras', campo, o[campo], valor, obraId, obraId, 'obra'); return { ...o, [campo]: valor }; }
       return o;
     }));
     const dbField = { previsao: 'previsao', status: 'status', nome: 'nome', endereco: 'endereco', orcamento: 'orcamento' }[campo] || campo;
@@ -330,7 +346,7 @@ export const AppProvider = ({ children }) => {
     setObras(prev => prev.map(o => {
       if (o.id === obraId) {
         return { ...o, gastosDespesas: o.gastosDespesas.map(g => {
-          if (g.id === gastoId) { registrarAlteracao('Gastos', campo, g[campo], valor, obraId); return { ...g, [campo]: valor }; }
+          if (g.id === gastoId) { registrarAlteracao('Gastos', campo, g[campo], valor, obraId, gastoId, 'gasto'); return { ...g, [campo]: valor }; }
           return g;
         })};
       }
@@ -439,7 +455,7 @@ export const AppProvider = ({ children }) => {
 
   const updateProposta = useCallback(async (propostaId, campo, valor) => {
     setPropostas(prev => prev.map(p => {
-      if (p.id === propostaId) { registrarAlteracao('Proposta', campo, p[campo], valor, p.obraId); return { ...p, [campo]: valor }; }
+      if (p.id === propostaId) { registrarAlteracao('Proposta', campo, p[campo], valor, p.obraId, propostaId, 'proposta'); return { ...p, [campo]: valor }; }
       return p;
     }));
     const dbMap = {
@@ -473,7 +489,7 @@ export const AppProvider = ({ children }) => {
 
   const updateEtapaCronograma = useCallback(async (etapaId, campo, valor) => {
     setCronogramas(prev => prev.map(c => {
-      if (c.id === etapaId) { registrarAlteracao('Cronograma', campo, c[campo], valor, c.obraId); return { ...c, [campo]: campo === 'custo' || campo === 'progresso' ? parseFloat(valor) || 0 : valor }; }
+      if (c.id === etapaId) { registrarAlteracao('Cronograma', campo, c[campo], valor, c.obraId, etapaId, 'cronograma'); return { ...c, [campo]: campo === 'custo' || campo === 'progresso' ? parseFloat(valor) || 0 : valor }; }
       return c;
     }));
     const dbMap = { etapa: 'etapa', dataInicio: 'data_inicio', dataFim: 'data_fim', custo: 'custo', progresso: 'progresso', cor: 'cor' };
@@ -526,7 +542,7 @@ export const AppProvider = ({ children }) => {
 
   const updateFuncionario = useCallback(async (funcId, campo, valor) => {
     setFuncionarios(prev => prev.map(f => {
-      if (f.id === funcId) { registrarAlteracao('Funcionários', campo, f[campo], valor); return { ...f, [campo]: campo === 'custoDiaria' || campo === 'diasTrabalhados' ? parseFloat(valor) || 0 : valor }; }
+      if (f.id === funcId) { registrarAlteracao('Funcionários', campo, f[campo], valor, null, funcId, 'funcionario'); return { ...f, [campo]: campo === 'custoDiaria' || campo === 'diasTrabalhados' ? parseFloat(valor) || 0 : valor }; }
       return f;
     }));
     const dbMap = { nome: 'nome', funcao: 'funcao', custoDiaria: 'custo_diaria', diasTrabalhados: 'dias_trabalhados', obraAtualId: 'obra_atual_id', desempenho: 'desempenho' };
@@ -582,7 +598,7 @@ export const AppProvider = ({ children }) => {
 
   const updateCatalogoItem = useCallback(async (itemId, campo, valor) => {
     setCatalogo(prev => prev.map(i => {
-      if (i.id === itemId) { registrarAlteracao('Catálogo', campo, i[campo], valor); return { ...i, [campo]: campo === 'custo' ? parseFloat(valor) || 0 : valor }; }
+      if (i.id === itemId) { registrarAlteracao('Catálogo', campo, i[campo], valor, null, itemId, 'catalogo'); return { ...i, [campo]: campo === 'custo' ? parseFloat(valor) || 0 : valor }; }
       return i;
     }));
     await supabase.from('catalogo').update({ [campo]: valor }).eq('id', itemId);
@@ -610,7 +626,7 @@ export const AppProvider = ({ children }) => {
 
   const updateTransacao = useCallback(async (transId, campo, valor) => {
     setTransacoes(prev => prev.map(t => {
-      if (t.id === transId) { registrarAlteracao('Financeiro', campo, t[campo], valor); return { ...t, [campo]: campo === 'valor' ? parseFloat(valor) || 0 : valor }; }
+      if (t.id === transId) { registrarAlteracao('Financeiro', campo, t[campo], valor, null, transId, 'transacao'); return { ...t, [campo]: campo === 'valor' ? parseFloat(valor) || 0 : valor }; }
       return t;
     }));
     await supabase.from('transacoes').update({ [campo]: valor }).eq('id', transId);
@@ -665,6 +681,69 @@ export const AppProvider = ({ children }) => {
     return Object.entries(mapa).map(([nome, total]) => ({ nome, total })).sort((a, b) => b.total - a.total);
   };
 
+  // ── Reverter alteração (undo real) ────────────────────────
+  const reverterAlteracao = async (altId) => {
+    const alt = historico.find(h => h.id === altId);
+    if (!alt || alt.desfeito || alt.anterior === null || !alt.entityType) return;
+
+    setHistorico(prev => prev.map(h => h.id === altId ? { ...h, desfeito: true } : h));
+    supabase.from('historico').update({ desfeito: true }).eq('id', altId);
+
+    const val = alt.anterior;
+    const valNum = parseFloat(val);
+
+    switch (alt.entityType) {
+      case 'obra': {
+        const dbField = { nome:'nome', endereco:'endereco', status:'status', orcamento:'orcamento', previsao:'previsao' }[alt.campo] || alt.campo;
+        const tv = alt.campo === 'orcamento' && !isNaN(valNum) ? valNum : val;
+        setObras(prev => prev.map(o => o.id === alt.entityId ? { ...o, [alt.campo]: tv } : o));
+        await supabase.from('obras').update({ [dbField]: tv }).eq('id', alt.entityId);
+        break;
+      }
+      case 'gasto': {
+        const tv = alt.campo === 'valor' && !isNaN(valNum) ? valNum : val;
+        setObras(prev => prev.map(o => o.id === alt.obraId
+          ? { ...o, gastosDespesas: o.gastosDespesas.map(g => g.id === alt.entityId ? { ...g, [alt.campo]: tv } : g) } : o));
+        await supabase.from('gastos_despesas').update({ [alt.campo]: tv }).eq('id', alt.entityId);
+        break;
+      }
+      case 'proposta': {
+        const dbMap = { clienteNome:'cliente_nome', clienteCnpj:'cliente_cnpj', clienteEndereco:'cliente_endereco', margemLucro:'margem_lucro', impostos:'impostos', condicoesPagamento:'condicoes_pagamento', valorProposto:'valor_proposto', observacoes:'observacoes', obraId:'obra_id', orcamentoId:'orcamento_id', nome:'nome' };
+        const tv = ['margemLucro','impostos','valorProposto'].includes(alt.campo) && !isNaN(valNum) ? valNum : val;
+        setPropostas(prev => prev.map(p => p.id === alt.entityId ? { ...p, [alt.campo]: tv } : p));
+        await supabase.from('propostas').update({ [dbMap[alt.campo] || alt.campo]: tv }).eq('id', alt.entityId);
+        break;
+      }
+      case 'cronograma': {
+        const dbMap = { etapa:'etapa', dataInicio:'data_inicio', dataFim:'data_fim', custo:'custo', progresso:'progresso', cor:'cor' };
+        const tv = ['custo','progresso'].includes(alt.campo) && !isNaN(valNum) ? valNum : val;
+        setCronogramas(prev => prev.map(c => c.id === alt.entityId ? { ...c, [alt.campo]: tv } : c));
+        await supabase.from('cronogramas').update({ [dbMap[alt.campo] || alt.campo]: tv }).eq('id', alt.entityId);
+        break;
+      }
+      case 'funcionario': {
+        const dbMap = { nome:'nome', funcao:'funcao', custoDiaria:'custo_diaria', diasTrabalhados:'dias_trabalhados', obraAtualId:'obra_atual_id' };
+        const tv = ['custoDiaria','diasTrabalhados'].includes(alt.campo) && !isNaN(valNum) ? valNum : val;
+        setFuncionarios(prev => prev.map(f => f.id === alt.entityId ? { ...f, [alt.campo]: tv } : f));
+        await supabase.from('funcionarios').update({ [dbMap[alt.campo] || alt.campo]: tv || null }).eq('id', alt.entityId);
+        break;
+      }
+      case 'catalogo': {
+        const tv = alt.campo === 'custo' && !isNaN(valNum) ? valNum : val;
+        setCatalogo(prev => prev.map(i => i.id === alt.entityId ? { ...i, [alt.campo]: tv } : i));
+        await supabase.from('catalogo').update({ [alt.campo]: tv }).eq('id', alt.entityId);
+        break;
+      }
+      case 'transacao': {
+        const tv = alt.campo === 'valor' && !isNaN(valNum) ? valNum : val;
+        setTransacoes(prev => prev.map(t => t.id === alt.entityId ? { ...t, [alt.campo]: tv } : t));
+        await supabase.from('transacoes').update({ [alt.campo]: tv }).eq('id', alt.entityId);
+        break;
+      }
+      default: break;
+    }
+  };
+
   // ── Notificações ──────────────────────────────────────────
   const marcarComoLida = (id) => setNotificacoes(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n));
   const getNotificacoesNaoLidas = () => notificacoes.filter(n => !n.lida).length;
@@ -694,7 +773,7 @@ export const AppProvider = ({ children }) => {
       transacoes, addTransacao, updateTransacao, deleteTransacao,
       compras, addCompra, updateCompra, deleteCompra,
       notificacoes, marcarComoLida, getNotificacoesNaoLidas,
-      historico, registrarAlteracao, desfazerAlteracao,
+      historico, registrarAlteracao, reverterAlteracao,
       versoes, salvarVersao,
       formatCurrency, formatDate
     }}>
