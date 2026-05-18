@@ -95,14 +95,15 @@ export default function Orcamentos() {
     updateExtras({ ...extras, maoDeObra: newList });
   };
 
-  const calcularDistancia = async () => {
+  const calcularDistancia = async (destinoOverride) => {
+    const destino = destinoOverride || mob.enderecoDestino;
     setCalcLoading(true);
     try {
       if (!empresa?.endereco) throw new Error('Configure o endereço da empresa no Perfil primeiro.');
-      if (!mob.enderecoDestino) throw new Error('Informe o endereço de destino.');
+      if (!destino) throw new Error('Informe o endereço de destino.');
       const [r1, r2] = await Promise.all([
         fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(empresa.endereco)}&format=json&limit=1`).then(r => r.json()),
-        fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(mob.enderecoDestino)}&format=json&limit=1`).then(r => r.json()),
+        fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destino)}&format=json&limit=1`).then(r => r.json()),
       ]);
       if (!r1.length) throw new Error('Endereço da empresa não encontrado.');
       if (!r2.length) throw new Error('Endereço de destino não encontrado.');
@@ -113,7 +114,7 @@ export default function Orcamentos() {
       const dLon = (lon2 - lon1) * Math.PI / 180;
       const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
       const distKm = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1.3 * 10) / 10;
-      const newMob = { ...mob, distanciaKm: distKm };
+      const newMob = { ...mob, enderecoDestino: destino, distanciaKm: distKm };
       setMob(newMob);
       updateExtras({ ...extras, mobilizacao: newMob });
     } catch (e) { alert(e.message); }
@@ -136,6 +137,8 @@ export default function Orcamentos() {
       const endereco = `${data.logradouro}, ${data.numero}${data.complemento ? ' - ' + data.complemento : ''} - ${data.bairro} - ${data.municipio}/${data.uf}`;
       const novo = { ...cli, cnpj, nome: data.razao_social, endereco };
       saveCli(novo);
+      // auto-fill mobilização destination and calculate distance
+      await calcularDistancia(endereco);
     } catch (err) {
       alert('Erro ao buscar: ' + err.message);
     } finally {
