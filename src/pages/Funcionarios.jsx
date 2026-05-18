@@ -66,7 +66,7 @@ export default function Funcionarios() {
   const {
     funcionarios, addFuncionario, updateFuncionario, deleteFuncionario,
     registrosDesempenho, addRegistroDesempenho,
-    obras, formatCurrency
+    obras, listaOrcamentos, getTotalOrcamento, propostas, formatCurrency
   } = useAppContext();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,7 +79,35 @@ export default function Funcionarios() {
 
   const [mesReg, setMesReg] = useState('Janeiro');
   const [perfReg, setPerfReg] = useState(100);
-  const [valorReg, setValorReg] = useState(0);
+  const [valorReg, setValorReg] = useState('');
+  const [obraReg, setObraReg] = useState('');
+
+  // Obras concluídas (qualquer status que indique conclusão)
+  const obrasConcluidas = obras.filter(o =>
+    o.status === 'Concluída' || o.status === 'Concluido' || o.status === 'Finalizada'
+  );
+
+  const calcValorGerado = (obraId, funcId) => {
+    if (!obraId || !funcId) return null;
+    const obra = obras.find(o => o.id === obraId);
+    const orc = listaOrcamentos.find(lo => lo.obraId === obraId);
+    if (!obra) return null;
+    // Revenue: prefer proposta value, fallback to obra budget
+    const proposta = propostas.find(p => p.obraId === obraId);
+    const receita = proposta?.valorProposto || obra.orcamento || 0;
+    if (!orc) return receita > 0 ? null : 0; // no orçamento → can't split, let user enter manually
+    const empMO = (orc.extras?.maoDeObra || []).find(m => m.funcionarioId === funcId);
+    const empCusto = empMO ? (empMO.diasPrevistos * empMO.custoDiaria) : 0;
+    const totalCusto = getTotalOrcamento(orc.id);
+    if (totalCusto === 0 || receita === 0) return 0;
+    return Math.round((empCusto / totalCusto) * receita * 100) / 100;
+  };
+
+  const handleObraRegChange = (obraId) => {
+    setObraReg(obraId);
+    const calc = calcValorGerado(obraId, selectedFuncId);
+    if (calc !== null) setValorReg(String(calc));
+  };
 
   const handleAddFuncionario = (e) => {
     e.preventDefault();
@@ -162,7 +190,7 @@ export default function Funcionarios() {
                     value={obra ? obra.nome : 'Sem alocação'}
                     type="select"
                     options={[{ value: '', label: 'Sem alocação' }, ...obras.map(o => ({ value: String(o.id), label: o.nome }))]}
-                    onSave={v => updateFuncionario(f.id, 'obraAtualId', v ? parseInt(v) : null)}
+                    onSave={v => updateFuncionario(f.id, 'obraAtualId', v || null)}
                   />
                 </div>
               </div>
@@ -170,7 +198,7 @@ export default function Funcionarios() {
               <div style={{ marginBottom: 16 }}>
                 <div className="flex justify-between items-center mb-2">
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Desempenho Mensal</span>
-                  <button className="text-primary" style={{ fontSize: 11, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }} onClick={() => { setSelectedFuncId(f.id); setIsRecordModal(true); }}>
+                  <button className="text-primary" style={{ fontSize: 11, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }} onClick={() => { setSelectedFuncId(f.id); setObraReg(''); setValorReg(''); setIsRecordModal(true); }}>
                     + Registrar Mês
                   </button>
                 </div>
@@ -236,7 +264,7 @@ export default function Funcionarios() {
             <div style={{ flex: 1 }}>
               <label className="text-secondary" style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>Mês</label>
               <select value={mesReg} onChange={e => setMesReg(e.target.value)} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
-                {['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'].map(m => (
+                {['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map(m => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
@@ -246,10 +274,45 @@ export default function Funcionarios() {
               <input type="number" min="0" max="100" value={perfReg} onChange={e => setPerfReg(e.target.value)} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }} />
             </div>
           </div>
+
           <div>
-            <label className="text-secondary" style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>Valor Gerado no Mês (R$)</label>
-            <input required type="number" value={valorReg} onChange={e => setValorReg(e.target.value)} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }} />
+            <label className="text-secondary" style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>Obra Concluída (opcional)</label>
+            <select value={obraReg} onChange={e => handleObraRegChange(e.target.value)} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
+              <option value="">Selecionar obra para calcular valor...</option>
+              {obrasConcluidas.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+            </select>
+            {obraReg && (() => {
+              const orc = listaOrcamentos.find(lo => lo.obraId === obraReg);
+              const empMO = orc?.extras?.maoDeObra?.find(m => m.funcionarioId === selectedFuncId);
+              const obra = obras.find(o => o.id === obraReg);
+              const proposta = propostas.find(p => p.obraId === obraReg);
+              const receita = proposta?.valorProposto || obra?.orcamento || 0;
+              const totalCusto = orc ? getTotalOrcamento(orc.id) : 0;
+              const empCusto = empMO ? empMO.diasPrevistos * empMO.custoDiaria : 0;
+              const perc = totalCusto > 0 ? ((empCusto / totalCusto) * 100).toFixed(1) : 0;
+              return (
+                <div style={{ marginTop: 8, padding: '10px 12px', background: 'var(--primary-light, rgba(37,99,235,0.08))', borderRadius: 8, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  {empMO
+                    ? <><strong>{empMO.diasPrevistos} dias</strong> × {formatCurrency(empMO.custoDiaria)}/dia = <strong>{formatCurrency(empCusto)}</strong> de custo<br />
+                       Representa <strong>{perc}%</strong> do custo total da obra ({formatCurrency(totalCusto)})<br />
+                       Receita da obra: <strong>{formatCurrency(receita)}</strong> → Valor gerado: <strong style={{ color: 'var(--success)' }}>{formatCurrency(parseFloat(valorReg) || 0)}</strong></>
+                    : <span style={{ color: 'var(--warning)' }}>Funcionário não encontrado no orçamento desta obra. Insira o valor manualmente.</span>
+                  }
+                </div>
+              );
+            })()}
           </div>
+
+          <div>
+            <label className="text-secondary" style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>
+              Valor Gerado (R$)
+              {obraReg && calcValorGerado(obraReg, selectedFuncId) !== null && (
+                <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--primary)', fontWeight: 400 }}>calculado automaticamente</span>
+              )}
+            </label>
+            <input required type="number" step="0.01" value={valorReg} onChange={e => setValorReg(e.target.value)} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }} placeholder="0.00" />
+          </div>
+
           <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Salvar Registro</button>
         </form>
       </Modal>
