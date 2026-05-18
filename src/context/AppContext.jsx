@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useCallback, useEffect } from 'react';
+import { createContext, useState, useContext, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AppContext = createContext();
@@ -68,6 +68,10 @@ export const AppProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
+
+  // ref sempre atualizado para uso dentro de useCallback (evita closure stale)
+  const sessionRef = useRef(null);
+  useEffect(() => { sessionRef.current = session; }, [session]);
 
   // ── Data ──────────────────────────────────────────────────
   const [empresa, setEmpresa] = useState(DEFAULT_EMPRESA);
@@ -156,7 +160,7 @@ export const AppProvider = ({ children }) => {
     setDataLoading(false);
   };
 
-  const uid = () => session?.user?.id;
+  const uid = () => sessionRef.current?.user?.id;
 
   // ── Auth methods ──────────────────────────────────────────
   const login = async (email, password) => {
