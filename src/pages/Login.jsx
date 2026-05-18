@@ -12,11 +12,34 @@ export default function Login() {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  // Rate limiting: block after 5 failed attempts for 60 s
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockUntil, setLockUntil] = useState(null);
   const { login, signUp } = useAppContext();
   const navigate = useNavigate();
 
+  const validatePassword = (pwd) => {
+    if (pwd.length < 8) return 'Mínimo 8 caracteres';
+    if (!/[A-Z]/.test(pwd)) return 'Inclua ao menos uma letra maiúscula';
+    if (!/[0-9]/.test(pwd)) return 'Inclua ao menos um número';
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Rate limit check
+    if (lockUntil && Date.now() < lockUntil) {
+      const secs = Math.ceil((lockUntil - Date.now()) / 1000);
+      setError(`Muitas tentativas incorretas. Aguarde ${secs} segundo${secs !== 1 ? 's' : ''}.`);
+      return;
+    }
+
+    if (mode === 'signup') {
+      const pwdError = validatePassword(password);
+      if (pwdError) { setError(pwdError); return; }
+    }
+
     setLoading(true);
     setError('');
     setInfo('');
@@ -24,9 +47,19 @@ export default function Login() {
     if (mode === 'login') {
       const result = await login(email, password);
       if (result.success) {
+        setFailedAttempts(0);
+        setLockUntil(null);
         navigate('/');
       } else {
-        setError(result.error || 'E-mail ou senha incorretos.');
+        const next = failedAttempts + 1;
+        if (next >= 5) {
+          setLockUntil(Date.now() + 60_000);
+          setFailedAttempts(0);
+          setError('Muitas tentativas incorretas. Aguarde 60 segundos antes de tentar novamente.');
+        } else {
+          setFailedAttempts(next);
+          setError(result.error || 'E-mail ou senha incorretos.');
+        }
         setLoading(false);
       }
     } else {
@@ -90,8 +123,8 @@ export default function Login() {
               <input
                 required type={showPassword ? 'text' : 'password'}
                 value={password} onChange={e => setPassword(e.target.value)}
-                placeholder={mode === 'signup' ? 'Mínimo 6 caracteres' : 'Sua senha'}
-                minLength={6}
+                placeholder={mode === 'signup' ? 'Mín. 8 chars, 1 maiúscula, 1 número' : 'Sua senha'}
+                minLength={mode === 'signup' ? 8 : 1}
                 style={{
                   width: '100%', padding: '10px 40px',
                   borderRadius: 'var(--radius-md)',

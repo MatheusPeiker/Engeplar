@@ -19,18 +19,19 @@ export default function Perfil() {
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${clean}`);
       if (!response.ok) throw new Error('CNPJ não encontrado');
       const data = await response.json();
+      const san = (v, max = 200) => v == null ? '' : String(v).replace(/[<>"']/g, '').trim().substring(0, max);
       const endereco = [
         data.logradouro, data.numero,
-        data.complemento ? data.complemento : null,
+        data.complemento || null,
         data.bairro, `${data.municipio}/${data.uf}`
-      ].filter(Boolean).join(', ');
+      ].filter(Boolean).map(s => san(s, 100)).join(', ');
       await Promise.all([
         updateEmpresa('cnpj', cnpjInput || empresa.cnpj),
-        updateEmpresa('razaoSocial', data.razao_social),
-        updateEmpresa('nomeFantasia', data.nome_fantasia || data.razao_social),
+        updateEmpresa('razaoSocial', san(data.razao_social)),
+        updateEmpresa('nomeFantasia', san(data.nome_fantasia || data.razao_social)),
         updateEmpresa('endereco', endereco),
-        data.ddd_telefone_1 && updateEmpresa('telefone', data.ddd_telefone_1.trim()),
-        data.email && updateEmpresa('email', data.email.toLowerCase()),
+        data.ddd_telefone_1 && updateEmpresa('telefone', san(data.ddd_telefone_1, 20)),
+        data.email && updateEmpresa('email', san(data.email, 150).toLowerCase()),
       ].filter(Boolean));
     } catch (err) {
       alert('Erro ao buscar CNPJ: ' + err.message);

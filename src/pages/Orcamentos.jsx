@@ -4,6 +4,11 @@ import { useAppContext } from '../context/AppContext';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
+// Sanitize user content before injecting into HTML strings (XSS prevention)
+const esc = (s) => s == null ? '' : String(s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
 function SecaoHeader({ titulo, icone: Icon, cor }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
@@ -73,7 +78,7 @@ export default function Orcamentos() {
     const fmt = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
     const obraVinculada = currentOrc.obraId ? obras.find(o => o.id === currentOrc.obraId)?.nome : null;
     const nomeEmpresa = empresa?.nomeFantasia || empresa?.razaoSocial || 'Empresa';
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orçamento - ${currentOrc.nome}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orçamento - ${esc(currentOrc.nome)}</title>
     <style>
       body{font-family:Arial,sans-serif;padding:40px;color:#111;max-width:860px;margin:0 auto}
       h1{font-size:22px;margin-bottom:4px}h2{font-size:14px;border-bottom:2px solid #1E3A8A;padding-bottom:5px;color:#1E3A8A;margin:20px 0 10px}
@@ -86,22 +91,22 @@ export default function Orcamentos() {
       @media print{button{display:none}}
     </style></head><body>
     <div class="header">
-      <div><h1>${currentOrc.nome}</h1><p style="color:#666;font-size:13px;margin-top:4px">${nomeEmpresa}</p>${obraVinculada ? `<p style="font-size:12px;color:#1E3A8A;margin-top:2px">Obra: ${obraVinculada}</p>` : ''}</div>
+      <div><h1>${esc(currentOrc.nome)}</h1><p style="color:#666;font-size:13px;margin-top:4px">${esc(nomeEmpresa)}</p>${obraVinculada ? `<p style="font-size:12px;color:#1E3A8A;margin-top:2px">Obra: ${esc(obraVinculada)}</p>` : ''}</div>
       <p style="font-size:12px;color:#888">${new Date().toLocaleDateString('pt-BR')}</p>
     </div>
     ${items.length > 0 ? `<h2>Materiais e Serviços</h2>
     <table><thead><tr><th>Descrição</th><th>Categoria</th><th>Unid.</th><th class="right">Qtd</th><th class="right">Unitário</th><th class="right">Total</th></tr></thead>
-    <tbody>${items.map(i => `<tr><td>${i.descricao}</td><td>${i.categoria||''}</td><td>${i.unidade||''}</td><td class="right">${i.quantidade}</td><td class="right">${fmt(i.custoUnitario)}</td><td class="right">${fmt(i.quantidade*i.custoUnitario)}</td></tr>`).join('')}
+    <tbody>${items.map(i => `<tr><td>${esc(i.descricao)}</td><td>${esc(i.categoria)}</td><td>${esc(i.unidade)}</td><td class="right">${i.quantidade}</td><td class="right">${fmt(i.custoUnitario)}</td><td class="right">${fmt(i.quantidade*i.custoUnitario)}</td></tr>`).join('')}
     <tr class="total-row"><td colspan="5" class="right">Subtotal Materiais</td><td class="right">${fmt(totalItens)}</td></tr></tbody></table>` : ''}
     ${maoDeObra.length > 0 ? `<h2>Mão de Obra</h2>
     <table><thead><tr><th>Profissional</th><th>Função</th><th class="right">Dias</th><th class="right">Custo/Dia</th><th class="right">Subtotal</th></tr></thead>
-    <tbody>${maoDeObra.map(m => `<tr><td>${m.nome}</td><td>${m.funcao||''}</td><td class="right">${m.diasPrevistos}</td><td class="right">${fmt(m.custoDiaria)}</td><td class="right">${fmt(m.custoDiaria*m.diasPrevistos)}</td></tr>`).join('')}
+    <tbody>${maoDeObra.map(m => `<tr><td>${esc(m.nome)}</td><td>${esc(m.funcao)}</td><td class="right">${m.diasPrevistos}</td><td class="right">${fmt(m.custoDiaria)}</td><td class="right">${fmt(m.custoDiaria*m.diasPrevistos)}</td></tr>`).join('')}
     <tr class="total-row"><td colspan="4" class="right">Subtotal M.O.</td><td class="right">${fmt(totalMO)}</td></tr></tbody></table>` : ''}
     ${totalMob > 0 ? `<h2>Mobilização</h2>
     <table><thead><tr><th>Descrição</th><th class="right">Valor</th></tr></thead><tbody>
-    ${mob.veiculo ? `<tr><td>Veículo</td><td class="right">${mob.veiculo}</td></tr>` : ''}
-    ${mob.enderecoDestino ? `<tr><td>Destino</td><td class="right">${mob.enderecoDestino}</td></tr>` : ''}
-    ${mob.distanciaKm ? `<tr><td>Distância</td><td class="right">${mob.distanciaKm} km</td></tr>` : ''}
+    ${mob.veiculo ? `<tr><td>Veículo</td><td class="right">${esc(mob.veiculo)}</td></tr>` : ''}
+    ${mob.enderecoDestino ? `<tr><td>Destino</td><td class="right">${esc(mob.enderecoDestino)}</td></tr>` : ''}
+    ${mob.distanciaKm ? `<tr><td>Distância</td><td class="right">${esc(mob.distanciaKm)} km</td></tr>` : ''}
     <tr class="total-row"><td class="right">Subtotal Mobilização</td><td class="right">${fmt(totalMob)}</td></tr></tbody></table>` : ''}
     <div class="grand-total"><span style="font-size:15px;opacity:.8">TOTAL GERAL</span><span style="font-size:22px;font-weight:800">${fmt(grandTotal)}</span></div>
     <script>window.onload=()=>window.print()</script></body></html>`;

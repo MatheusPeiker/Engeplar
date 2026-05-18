@@ -4,6 +4,11 @@ import { useAppContext } from '../context/AppContext';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
+// Sanitize user content before injecting into HTML strings (XSS prevention)
+const esc = (s) => s == null ? '' : String(s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
 const STATUS_PROPOSTA = {
   rascunho: { label: 'Rascunho',  color: 'var(--text-muted)',  bg: 'var(--background)' },
   enviada:  { label: 'Enviada',   color: 'var(--primary)',     bg: 'var(--primary-light)' },
@@ -69,7 +74,7 @@ export default function Proposta() {
     const orc = proposta.orcamentoId ? listaOrcamentos.find(o => o.id === proposta.orcamentoId) : null;
     const fmt = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
     const nomeEmpresa = empresa?.nomeFantasia || empresa?.razaoSocial || 'Empresa';
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Proposta - ${proposta.nome}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Proposta - ${esc(proposta.nome)}</title>
     <style>
       body{font-family:Arial,sans-serif;padding:40px;color:#111;max-width:800px;margin:0 auto}
       h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;border-bottom:2px solid #1E3A8A;padding-bottom:6px;color:#1E3A8A;margin-top:24px}
@@ -83,24 +88,24 @@ export default function Proposta() {
       @media print{button{display:none}}
     </style></head><body>
     <div class="header">
-      <div><h1>${proposta.nome}</h1><p style="color:#666;font-size:13px;margin-top:4px">${nomeEmpresa}</p></div>
-      <div style="text-align:right"><span class="badge">${STATUS_PROPOSTA[proposta.status]?.label || 'Rascunho'}</span><p style="font-size:12px;color:#888;margin-top:6px">${new Date().toLocaleDateString('pt-BR')}</p></div>
+      <div><h1>${esc(proposta.nome)}</h1><p style="color:#666;font-size:13px;margin-top:4px">${esc(nomeEmpresa)}</p></div>
+      <div style="text-align:right"><span class="badge">${esc(STATUS_PROPOSTA[proposta.status]?.label || 'Rascunho')}</span><p style="font-size:12px;color:#888;margin-top:6px">${new Date().toLocaleDateString('pt-BR')}</p></div>
     </div>
     <h2>Cliente</h2>
-    <div class="row"><span>Razão Social</span><span>${proposta.clienteNome || '—'}</span></div>
-    <div class="row"><span>CNPJ</span><span>${proposta.clienteCnpj || '—'}</span></div>
-    <div class="row"><span>Endereço</span><span>${proposta.clienteEndereco || '—'}</span></div>
-    ${orc ? `<h2>Orçamento de Referência: ${orc.nome}</h2>
+    <div class="row"><span>Razão Social</span><span>${esc(proposta.clienteNome) || '—'}</span></div>
+    <div class="row"><span>CNPJ</span><span>${esc(proposta.clienteCnpj) || '—'}</span></div>
+    <div class="row"><span>Endereço</span><span>${esc(proposta.clienteEndereco) || '—'}</span></div>
+    ${orc ? `<h2>Orçamento de Referência: ${esc(orc.nome)}</h2>
     <table><thead><tr><th>Descrição</th><th>Qtd</th><th>Unitário</th><th>Total</th></tr></thead><tbody>
-    ${orc.itens.map(i => `<tr><td>${i.descricao}</td><td>${i.quantidade}</td><td>${fmt(i.custoUnitario)}</td><td>${fmt(i.quantidade*i.custoUnitario)}</td></tr>`).join('')}
+    ${orc.itens.map(i => `<tr><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${fmt(i.custoUnitario)}</td><td>${fmt(i.quantidade*i.custoUnitario)}</td></tr>`).join('')}
     </tbody></table>` : ''}
     <h2>Valores</h2>
     <div class="row"><span>Custo Base</span><span>${fmt(custoReal)}</span></div>
     <div class="row"><span>Margem de Lucro</span><span>${proposta.margemLucro}%</span></div>
     <div class="row"><span>Impostos</span><span>${proposta.impostos}%</span></div>
-    <div class="row"><span>Condições de Pagamento</span><span>${proposta.condicoesPagamento || '—'}</span></div>
+    <div class="row"><span>Condições de Pagamento</span><span>${esc(proposta.condicoesPagamento) || '—'}</span></div>
     <div class="row total"><span>Valor Total da Proposta</span><span>${fmt(valorProposto)}</span></div>
-    ${proposta.observacoes ? `<h2>Observações</h2><p style="font-size:13px;color:#444">${proposta.observacoes}</p>` : ''}
+    ${proposta.observacoes ? `<h2>Observações</h2><p style="font-size:13px;color:#444">${esc(proposta.observacoes)}</p>` : ''}
     <script>window.onload=()=>window.print()</script></body></html>`;
     const win = window.open('', '_blank');
     if (win) { win.document.write(html); win.document.close(); }

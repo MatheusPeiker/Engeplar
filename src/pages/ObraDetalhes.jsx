@@ -60,6 +60,11 @@ export default function ObraDetalhes() {
 
   const hoje = new Date().toISOString().split('T')[0];
 
+  // Sanitize user content before injecting into HTML strings (XSS prevention)
+  const esc = (s) => s == null ? '' : String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
   const STATUS_PROPOSTA = {
     rascunho: { label: 'Rascunho',  color: 'var(--text-muted)',  bg: 'var(--background)' },
     enviada:  { label: 'Enviada',   color: 'var(--primary)',     bg: 'var(--primary-light)' },
@@ -78,22 +83,22 @@ export default function ObraDetalhes() {
     const fmt = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const linhasItens = orcItens.map(i => `
       <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${i.descricao}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;">${i.unidade}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${esc(i.descricao)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;">${esc(i.unidade)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${i.quantidade}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${fmt(i.custoUnitario)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(i.quantidade * i.custoUnitario)}</td>
       </tr>`).join('');
     const linhasMO = orcMO.map(m => `
       <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${m.nome}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${m.funcao}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${esc(m.nome)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${esc(m.funcao)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;">${m.diasPrevistos} dias</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${fmt(m.custoDiaria)}/dia</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(m.custoDiaria * m.diasPrevistos)}</td>
       </tr>`).join('');
     const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
-      <title>Proposta — ${p.nome}</title>
+      <title>Proposta — ${esc(p.nome)}</title>
       <style>
         *{box-sizing:border-box;margin:0;padding:0;}
         body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#1f2937;background:#fff;padding:40px;}
@@ -123,24 +128,24 @@ export default function ObraDetalhes() {
       </style></head><body>
       <div class="header">
         <div class="logo-area">
-          <h1>${empresa?.nomeFantasia || empresa?.razaoSocial || 'Minha Empresa'}</h1>
-          <p>${empresa?.cnpj ? 'CNPJ: ' + empresa.cnpj : ''}</p>
-          <p>${empresa?.endereco || ''}</p>
-          <p>${empresa?.telefone || ''} ${empresa?.email ? '· ' + empresa.email : ''}</p>
+          <h1>${esc(empresa?.nomeFantasia || empresa?.razaoSocial || 'Minha Empresa')}</h1>
+          <p>${empresa?.cnpj ? 'CNPJ: ' + esc(empresa.cnpj) : ''}</p>
+          <p>${esc(empresa?.endereco || '')}</p>
+          <p>${esc(empresa?.telefone || '')} ${empresa?.email ? '· ' + esc(empresa.email) : ''}</p>
         </div>
         <div class="proposta-info">
           <h2>PROPOSTA COMERCIAL</h2>
-          <p>${p.nome}</p>
+          <p>${esc(p.nome)}</p>
           <p>Data: ${new Date().toLocaleDateString('pt-BR')}</p>
-          ${p.condicoesPagamento ? `<p style="margin-top:4px;font-size:10px;color:#374151;">Pagamento: ${p.condicoesPagamento}</p>` : ''}
+          ${p.condicoesPagamento ? `<p style="margin-top:4px;font-size:10px;color:#374151;">Pagamento: ${esc(p.condicoesPagamento)}</p>` : ''}
         </div>
       </div>
 
       <div class="cliente-box">
         <h3>Cliente</h3>
-        <p>${p.clienteNome || 'A definir'}</p>
-        ${p.clienteCnpj ? `<span>CNPJ: ${p.clienteCnpj}</span>` : ''}
-        ${p.clienteEndereco ? `<br/><span>${p.clienteEndereco}</span>` : ''}
+        <p>${esc(p.clienteNome) || 'A definir'}</p>
+        ${p.clienteCnpj ? `<span>CNPJ: ${esc(p.clienteCnpj)}</span>` : ''}
+        ${p.clienteEndereco ? `<br/><span>${esc(p.clienteEndereco)}</span>` : ''}
       </div>
 
       ${orcItens.length > 0 ? `<section>
@@ -164,7 +169,7 @@ export default function ObraDetalhes() {
         <table>
           <thead><tr><th>Item</th><th colspan="3"></th><th style="text-align:right">Valor</th></tr></thead>
           <tbody>
-            ${orcMob.veiculo ? `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">Veículo: ${orcMob.veiculo}</td><td colspan="3" style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${orcMob.distanciaKm} km · ${orcMob.numViagens} viagen(s)</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(totalMob)}</td></tr>` : ''}
+            ${orcMob.veiculo ? `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">Veículo: ${esc(orcMob.veiculo)}</td><td colspan="3" style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${esc(orcMob.distanciaKm)} km · ${esc(orcMob.numViagens)} viagen(s)</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(totalMob)}</td></tr>` : ''}
           </tbody>
         </table>
       </section>` : ''}
@@ -176,10 +181,10 @@ export default function ObraDetalhes() {
         <div class="totals-row final"><span>VALOR TOTAL DA PROPOSTA</span><span>${fmt(valorFinal)}</span></div>
       </div>
 
-      ${p.observacoes ? `<div class="obs"><strong>Observações:</strong> ${p.observacoes}</div>` : ''}
+      ${p.observacoes ? `<div class="obs"><strong>Observações:</strong> ${esc(p.observacoes)}</div>` : ''}
 
       <div class="footer">
-        <span>${empresa?.nomeFantasia || empresa?.razaoSocial || ''}</span>
+        <span>${esc(empresa?.nomeFantasia || empresa?.razaoSocial || '')}</span>
         <span>Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
       </div>
       <script>window.onload=()=>window.print();</script>

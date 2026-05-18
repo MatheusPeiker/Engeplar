@@ -4,6 +4,10 @@ import { Users, Plus, Trash2, CreditCard, Search, Loader2, Package, MapPin, Doll
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
+// Strip HTML tags and limit length — applied to data from external APIs
+const sanitizeText = (val, max = 200) =>
+  val == null ? '' : String(val).replace(/[<>"']/g, '').trim().substring(0, max);
+
 // Formatações utilitárias
 const formatCNPJ = (value) => {
   const cnpj = value.replace(/\D/g, '');
@@ -67,12 +71,14 @@ export default function Contatos() {
         const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${rawValue}`);
         if (response.ok) {
           const data = await response.json();
+          const endereco = [data.logradouro, data.numero, data.bairro, data.municipio, data.uf]
+            .filter(Boolean).map(s => sanitizeText(s, 100)).join(', ');
           setFormData(prev => ({
             ...prev,
-            nome: data.razao_social || data.nome_fantasia || prev.nome,
-            email: data.email || prev.email,
-            telefone: formatPhone(data.telefone || prev.telefone),
-            endereco: `${data.logradouro}, ${data.numero} - ${data.bairro}, ${data.municipio}-${data.uf}`,
+            nome: sanitizeText(data.razao_social || data.nome_fantasia) || prev.nome,
+            email: sanitizeText(data.email, 150) || prev.email,
+            telefone: formatPhone(sanitizeText(data.telefone, 20) || prev.telefone),
+            endereco: endereco || prev.endereco,
             tipo: 'Jurídica'
           }));
         } else {

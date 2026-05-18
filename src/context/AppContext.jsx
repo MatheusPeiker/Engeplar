@@ -3,6 +3,18 @@ import { supabase } from '../lib/supabase';
 
 const AppContext = createContext();
 
+// ── Security: whitelist of allowed campo values per entityType ──
+// Prevents arbitrary column injection via reverterAlteracao
+const ALLOWED_CAMPOS = {
+  obra:        new Set(['nome', 'endereco', 'status', 'orcamento', 'previsao']),
+  gasto:       new Set(['descricao', 'valor', 'data', 'categoria']),
+  proposta:    new Set(['nome', 'clienteNome', 'clienteCnpj', 'clienteEndereco', 'margemLucro', 'impostos', 'condicoesPagamento', 'valorProposto', 'observacoes', 'obraId', 'orcamentoId', 'status']),
+  cronograma:  new Set(['etapa', 'dataInicio', 'dataFim', 'custo', 'progresso', 'cor']),
+  funcionario: new Set(['nome', 'funcao', 'custoDiaria', 'diasTrabalhados', 'obraAtualId', 'desempenho']),
+  catalogo:    new Set(['nome', 'tipo', 'custo']),
+  transacao:   new Set(['descricao', 'data', 'valor', 'tipo', 'status']),
+};
+
 // ────────────────────────────────────────────────────────────
 // Normalizers: Supabase row → app shape
 // ────────────────────────────────────────────────────────────
@@ -70,13 +82,18 @@ const DEFAULT_EMPRESA = {
   endereco: '', telefone: '', email: '', site: '', logo: ''
 };
 
+const campoToDb = (campo) => ({
+  razaoSocial: 'razao_social', nomeFantasia: 'nome_fantasia', cnpj: 'cnpj',
+  inscricaoEstadual: 'inscricao_estadual', endereco: 'endereco',
+  telefone: 'telefone', email: 'email', site: 'site', logo: 'logo'
+}[campo] || campo);
+
 export const AppProvider = ({ children }) => {
   // ── Auth ──────────────────────────────────────────────────
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
 
-  // ref sempre atualizado para uso dentro de useCallback (evita closure stale)
   const sessionRef = useRef(null);
   useEffect(() => { sessionRef.current = session; }, [session]);
 
@@ -126,7 +143,7 @@ export const AppProvider = ({ children }) => {
     setObras([]); setListaOrcamentos([]); setPropostas([]);
     setCronogramas([]); setArquivos([]); setFuncionarios([]);
     setRegistrosDesempenho([]); setCatalogo([]); setTransacoes([]);
-    setCompras([]); setHistorico([]);
+    setCompras([]); setHistorico([]); setVersoes([]);
   };
 
   const loadAllData = async (uid) => {
@@ -225,22 +242,13 @@ export const AppProvider = ({ children }) => {
     const prev = empresa[campo];
     setEmpresa(e => ({ ...e, [campo]: valor }));
     registrarAlteracao('Empresa', campo, prev, valor);
-    await supabase.from('empresa').upsert({
-      user_id: uid(),
-      razao_social: empresa.razaoSocial, nome_fantasia: empresa.nomeFantasia,
-      cnpj: empresa.cnpj, inscricao_estadual: empresa.inscricaoEstadual,
-      endereco: empresa.endereco, telefone: empresa.telefone,
-      email: empresa.email, site: empresa.site, logo: empresa.logo,
-      [campoToDb(campo)]: valor,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id' });
+    // Single-field upsert — avoids stale-closure race condition
+    // ON CONFLICT (user_id) DO UPDATE SET <campo> = valor only; other cols untouched
+    await supabase.from('empresa').upsert(
+      { user_id: uid(), [campoToDb(campo)]: valor, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    );
   };
-
-  const campoToDb = (campo) => ({
-    razaoSocial: 'razao_social', nomeFantasia: 'nome_fantasia', cnpj: 'cnpj',
-    inscricaoEstadual: 'inscricao_estadual', endereco: 'endereco',
-    telefone: 'telefone', email: 'email', site: 'site', logo: 'logo'
-  }[campo] || campo);
 
   // ── Clientes ──────────────────────────────────────────────
   const addCliente = async (c) => {
@@ -253,12 +261,12 @@ export const AppProvider = ({ children }) => {
 
   const updateCliente = async (id, campo, valor) => {
     setClientes(prev => prev.map(c => c.id === id ? { ...c, [campo]: valor } : c));
-    await supabase.from('clientes').update({ [campo]: valor }).eq('id', id);
+    await supabase.from('clientes').update({ [campo]: valor }).eq('id', id).eq('user_id', uid());
   };
 
   const deleteCliente = async (id) => {
     setClientes(prev => prev.filter(c => c.id !== id));
-    await supabase.from('clientes').delete().eq('id', id);
+    await supabase.from('clientes').delete().eq('id', id).eq('user_id', uid());
   };
 
   // ── Fornecedores ──────────────────────────────────────────
@@ -272,12 +280,12 @@ export const AppProvider = ({ children }) => {
 
   const updateFornecedor = async (id, campo, valor) => {
     setFornecedores(prev => prev.map(f => f.id === id ? { ...f, [campo]: valor } : f));
-    await supabase.from('fornecedores').update({ [campo]: valor }).eq('id', id);
+    await supabase.from('fornecedores').update({ [campo]: valor }).eq('id', id).eq('user_id', uid());
   };
 
   const deleteFornecedor = async (id) => {
     setFornecedores(prev => prev.filter(f => f.id !== id));
-    await supabase.from('fornecedores').delete().eq('id', id);
+    await supabase.from('fornecedores').delete().eq('id', id).eq('user_id', uid());
   };
 
   // ── Obras ─────────────────────────────────────────────────
@@ -310,7 +318,7 @@ export const AppProvider = ({ children }) => {
       return o;
     }));
     const dbField = { previsao: 'previsao', status: 'status', nome: 'nome', endereco: 'endereco', orcamento: 'orcamento' }[campo] || campo;
-    await supabase.from('obras').update({ [dbField]: valor }).eq('id', obraId);
+    await supabase.from('obras').update({ [dbField]: valor }).eq('id', obraId).eq('user_id', uid());
   }, [registrarAlteracao]);
 
   const deleteObra = useCallback(async (obraId) => {
@@ -321,7 +329,9 @@ export const AppProvider = ({ children }) => {
     setPropostas(prev => prev.filter(p => p.obraId !== obraId));
     setCronogramas(prev => prev.filter(c => c.obraId !== obraId));
     setArquivos(prev => prev.filter(a => a.obraId !== obraId));
-    await supabase.from('obras').delete().eq('id', obraId);
+    // Libera funcionários alocados nesta obra no estado local (DB faz ON DELETE SET NULL)
+    setFuncionarios(prev => prev.map(f => f.obraAtualId === obraId ? { ...f, obraAtualId: null } : f));
+    await supabase.from('obras').delete().eq('id', obraId).eq('user_id', uid());
   }, [obras, registrarAlteracao]);
 
   const addGastoDaObra = async (obraId, novoGasto) => {
@@ -354,7 +364,7 @@ export const AppProvider = ({ children }) => {
       return o;
     }));
     const dbMap = { descricao: 'descricao', valor: 'valor', data: 'data', categoria: 'categoria' };
-    await supabase.from('gastos_despesas').update({ [dbMap[campo] || campo]: valor }).eq('id', gastoId);
+    await supabase.from('gastos_despesas').update({ [dbMap[campo] || campo]: valor }).eq('id', gastoId).eq('user_id', uid());
   }, [registrarAlteracao]);
 
   const deleteGasto = useCallback(async (obraId, gastoId) => {
@@ -366,7 +376,7 @@ export const AppProvider = ({ children }) => {
       }
       return o;
     }));
-    await supabase.from('gastos_despesas').delete().eq('id', gastoId);
+    await supabase.from('gastos_despesas').delete().eq('id', gastoId).eq('user_id', uid());
   }, [registrarAlteracao]);
 
   // ── Orçamentos ────────────────────────────────────────────
@@ -383,12 +393,12 @@ export const AppProvider = ({ children }) => {
   const updateOrcamento = async (orcId, campo, valor) => {
     setListaOrcamentos(prev => prev.map(o => o.id === orcId ? { ...o, [campo]: valor } : o));
     const dbMap = { nome: 'nome', obraId: 'obra_id' };
-    await supabase.from('orcamentos').update({ [dbMap[campo] || campo]: valor }).eq('id', orcId);
+    await supabase.from('orcamentos').update({ [dbMap[campo] || campo]: valor }).eq('id', orcId).eq('user_id', uid());
   };
 
   const deleteOrcamento = async (orcId) => {
     setListaOrcamentos(prev => prev.filter(o => o.id !== orcId));
-    await supabase.from('orcamentos').delete().eq('id', orcId);
+    await supabase.from('orcamentos').delete().eq('id', orcId).eq('user_id', uid());
   };
 
   const addOrcamentoItem = async (orcId, item) => {
@@ -409,17 +419,17 @@ export const AppProvider = ({ children }) => {
       ...o, itens: o.itens.map(i => i.id === itemId ? { ...i, [campo]: (campo === 'quantidade' || campo === 'custoUnitario') ? parseFloat(valor) || 0 : valor } : i)
     } : o));
     const dbMap = { descricao: 'descricao', categoria: 'categoria', unidade: 'unidade', quantidade: 'quantidade', custoUnitario: 'custo_unitario' };
-    await supabase.from('orcamento_itens').update({ [dbMap[campo] || campo]: valor }).eq('id', itemId);
+    await supabase.from('orcamento_itens').update({ [dbMap[campo] || campo]: valor }).eq('id', itemId).eq('user_id', uid());
   };
 
   const deleteOrcamentoItem = async (orcId, itemId) => {
     setListaOrcamentos(prev => prev.map(o => o.id === orcId ? { ...o, itens: o.itens.filter(i => i.id !== itemId) } : o));
-    await supabase.from('orcamento_itens').delete().eq('id', itemId);
+    await supabase.from('orcamento_itens').delete().eq('id', itemId).eq('user_id', uid());
   };
 
   const updateOrcamentoExtras = async (orcId, extras) => {
     setListaOrcamentos(prev => prev.map(o => o.id === orcId ? { ...o, extras } : o));
-    await supabase.from('orcamentos').update({ extras }).eq('id', orcId);
+    await supabase.from('orcamentos').update({ extras }).eq('id', orcId).eq('user_id', uid());
   };
 
   const getOrcamentoObra = (obraId) => {
@@ -465,12 +475,12 @@ export const AppProvider = ({ children }) => {
       margemLucro: 'margem_lucro', impostos: 'impostos', condicoesPagamento: 'condicoes_pagamento',
       valorProposto: 'valor_proposto', observacoes: 'observacoes', status: 'status'
     };
-    await supabase.from('propostas').update({ [dbMap[campo] || campo]: valor }).eq('id', propostaId);
+    await supabase.from('propostas').update({ [dbMap[campo] || campo]: valor }).eq('id', propostaId).eq('user_id', uid());
   }, [registrarAlteracao]);
 
   const deleteProposta = async (propostaId) => {
     setPropostas(prev => prev.filter(p => p.id !== propostaId));
-    await supabase.from('propostas').delete().eq('id', propostaId);
+    await supabase.from('propostas').delete().eq('id', propostaId).eq('user_id', uid());
   };
 
   // ── Cronograma ────────────────────────────────────────────
@@ -494,14 +504,14 @@ export const AppProvider = ({ children }) => {
       return c;
     }));
     const dbMap = { etapa: 'etapa', dataInicio: 'data_inicio', dataFim: 'data_fim', custo: 'custo', progresso: 'progresso', cor: 'cor' };
-    await supabase.from('cronogramas').update({ [dbMap[campo] || campo]: valor }).eq('id', etapaId);
+    await supabase.from('cronogramas').update({ [dbMap[campo] || campo]: valor }).eq('id', etapaId).eq('user_id', uid());
   }, [registrarAlteracao]);
 
   const deleteEtapaCronograma = useCallback(async (etapaId) => {
     const etapa = cronogramas.find(c => c.id === etapaId);
     if (etapa) registrarAlteracao('Cronograma', 'Etapa removida', etapa.etapa, null, etapa.obraId);
     setCronogramas(prev => prev.filter(c => c.id !== etapaId));
-    await supabase.from('cronogramas').delete().eq('id', etapaId);
+    await supabase.from('cronogramas').delete().eq('id', etapaId).eq('user_id', uid());
   }, [cronogramas, registrarAlteracao]);
 
   // ── Arquivos ──────────────────────────────────────────────
@@ -524,7 +534,7 @@ export const AppProvider = ({ children }) => {
     const arq = arquivos.find(a => a.id === arquivoId);
     if (arq) registrarAlteracao('Arquivos', 'Arquivo removido', arq.nome, null, arq.obraId);
     setArquivos(prev => prev.filter(a => a.id !== arquivoId));
-    await supabase.from('arquivos').delete().eq('id', arquivoId);
+    await supabase.from('arquivos').delete().eq('id', arquivoId).eq('user_id', uid());
   }, [arquivos, registrarAlteracao]);
 
   // ── Funcionários ──────────────────────────────────────────
@@ -547,19 +557,19 @@ export const AppProvider = ({ children }) => {
       return f;
     }));
     const dbMap = { nome: 'nome', funcao: 'funcao', custoDiaria: 'custo_diaria', diasTrabalhados: 'dias_trabalhados', obraAtualId: 'obra_atual_id', desempenho: 'desempenho' };
-    await supabase.from('funcionarios').update({ [dbMap[campo] || campo]: valor || null }).eq('id', funcId);
+    await supabase.from('funcionarios').update({ [dbMap[campo] || campo]: valor || null }).eq('id', funcId).eq('user_id', uid());
   }, [registrarAlteracao]);
 
   const deleteFuncionario = useCallback(async (funcId) => {
     const func = funcionarios.find(f => f.id === funcId);
     if (func) registrarAlteracao('Funcionários', 'Removido', func.nome, null);
     setFuncionarios(prev => prev.filter(f => f.id !== funcId));
-    await supabase.from('funcionarios').delete().eq('id', funcId);
+    await supabase.from('funcionarios').delete().eq('id', funcId).eq('user_id', uid());
   }, [funcionarios, registrarAlteracao]);
 
   const updateDias = async (funcId, dias) => {
     setFuncionarios(prev => prev.map(f => f.id === funcId ? { ...f, diasTrabalhados: dias } : f));
-    await supabase.from('funcionarios').update({ dias_trabalhados: dias }).eq('id', funcId);
+    await supabase.from('funcionarios').update({ dias_trabalhados: dias }).eq('id', funcId).eq('user_id', uid());
   };
 
   // ── Desempenho ────────────────────────────────────────────
@@ -577,12 +587,12 @@ export const AppProvider = ({ children }) => {
   const updateRegistroDesempenho = async (id, campo, valor) => {
     setRegistrosDesempenho(prev => prev.map(r => r.id === id ? { ...r, [campo]: valor } : r));
     const dbMap = { mes: 'mes', ano: 'ano', performance: 'performance', valorGerado: 'valor_gerado' };
-    await supabase.from('registros_desempenho').update({ [dbMap[campo] || campo]: valor }).eq('id', id);
+    await supabase.from('registros_desempenho').update({ [dbMap[campo] || campo]: valor }).eq('id', id).eq('user_id', uid());
   };
 
   const deleteRegistroDesempenho = async (id) => {
     setRegistrosDesempenho(prev => prev.filter(r => r.id !== id));
-    await supabase.from('registros_desempenho').delete().eq('id', id);
+    await supabase.from('registros_desempenho').delete().eq('id', id).eq('user_id', uid());
   };
 
   const getDesempenhoFuncionario = (funcId, ano = new Date().getFullYear()) =>
@@ -602,14 +612,14 @@ export const AppProvider = ({ children }) => {
       if (i.id === itemId) { registrarAlteracao('Catálogo', campo, i[campo], valor, null, itemId, 'catalogo'); return { ...i, [campo]: campo === 'custo' ? parseFloat(valor) || 0 : valor }; }
       return i;
     }));
-    await supabase.from('catalogo').update({ [campo]: valor }).eq('id', itemId);
+    await supabase.from('catalogo').update({ [campo]: valor }).eq('id', itemId).eq('user_id', uid());
   }, [registrarAlteracao]);
 
   const deleteCatalogoItem = useCallback(async (itemId) => {
     const item = catalogo.find(i => i.id === itemId);
     if (item) registrarAlteracao('Catálogo', 'Item removido', item.nome, null);
     setCatalogo(prev => prev.filter(i => i.id !== itemId));
-    await supabase.from('catalogo').delete().eq('id', itemId);
+    await supabase.from('catalogo').delete().eq('id', itemId).eq('user_id', uid());
   }, [catalogo, registrarAlteracao]);
 
   // ── Financeiro ────────────────────────────────────────────
@@ -630,12 +640,12 @@ export const AppProvider = ({ children }) => {
       if (t.id === transId) { registrarAlteracao('Financeiro', campo, t[campo], valor, null, transId, 'transacao'); return { ...t, [campo]: campo === 'valor' ? parseFloat(valor) || 0 : valor }; }
       return t;
     }));
-    await supabase.from('transacoes').update({ [campo]: valor }).eq('id', transId);
+    await supabase.from('transacoes').update({ [campo]: valor }).eq('id', transId).eq('user_id', uid());
   }, [registrarAlteracao]);
 
   const deleteTransacao = useCallback(async (transId) => {
     setTransacoes(prev => prev.filter(t => t.id !== transId));
-    await supabase.from('transacoes').delete().eq('id', transId);
+    await supabase.from('transacoes').delete().eq('id', transId).eq('user_id', uid());
   }, []);
 
   // ── Compras ───────────────────────────────────────────────
@@ -655,12 +665,12 @@ export const AppProvider = ({ children }) => {
   const updateCompra = useCallback(async (compraId, campo, valor) => {
     setCompras(prev => prev.map(c => c.id === compraId ? { ...c, [campo]: valor } : c));
     const dbMap = { obraId: 'obra_id', dataPedida: 'data_pedida', fornecedor: 'fornecedor', itens: 'itens', status: 'status', previsao: 'previsao', etapa: 'etapa' };
-    await supabase.from('compras').update({ [dbMap[campo] || campo]: valor }).eq('id', compraId);
+    await supabase.from('compras').update({ [dbMap[campo] || campo]: valor }).eq('id', compraId).eq('user_id', uid());
   }, []);
 
   const deleteCompra = useCallback(async (compraId) => {
     setCompras(prev => prev.filter(c => c.id !== compraId));
-    await supabase.from('compras').delete().eq('id', compraId);
+    await supabase.from('compras').delete().eq('id', compraId).eq('user_id', uid());
   }, []);
 
   // ── Métricas ──────────────────────────────────────────────
@@ -687,58 +697,75 @@ export const AppProvider = ({ children }) => {
     const alt = historico.find(h => h.id === altId);
     if (!alt || alt.desfeito || alt.anterior === null || !alt.entityType) return;
 
+    // Security: validate campo against allowed whitelist for this entityType
+    if (!ALLOWED_CAMPOS[alt.entityType]?.has(alt.campo)) return;
+
     setHistorico(prev => prev.map(h => h.id === altId ? { ...h, desfeito: true } : h));
-    supabase.from('historico').update({ desfeito: true }).eq('id', altId);
+    supabase.from('historico').update({ desfeito: true }).eq('id', altId).eq('user_id', uid());
 
     const val = alt.anterior;
     const valNum = parseFloat(val);
+    const currentUid = uid();
 
     switch (alt.entityType) {
       case 'obra': {
-        const dbField = { nome:'nome', endereco:'endereco', status:'status', orcamento:'orcamento', previsao:'previsao' }[alt.campo] || alt.campo;
+        const dbField = { nome:'nome', endereco:'endereco', status:'status', orcamento:'orcamento', previsao:'previsao' }[alt.campo];
+        if (!dbField) return;
         const tv = alt.campo === 'orcamento' && !isNaN(valNum) ? valNum : val;
         setObras(prev => prev.map(o => o.id === alt.entityId ? { ...o, [alt.campo]: tv } : o));
-        await supabase.from('obras').update({ [dbField]: tv }).eq('id', alt.entityId);
+        await supabase.from('obras').update({ [dbField]: tv }).eq('id', alt.entityId).eq('user_id', currentUid);
         break;
       }
       case 'gasto': {
+        const dbField = { descricao:'descricao', valor:'valor', data:'data', categoria:'categoria' }[alt.campo];
+        if (!dbField) return;
         const tv = alt.campo === 'valor' && !isNaN(valNum) ? valNum : val;
         setObras(prev => prev.map(o => o.id === alt.obraId
           ? { ...o, gastosDespesas: o.gastosDespesas.map(g => g.id === alt.entityId ? { ...g, [alt.campo]: tv } : g) } : o));
-        await supabase.from('gastos_despesas').update({ [alt.campo]: tv }).eq('id', alt.entityId);
+        await supabase.from('gastos_despesas').update({ [dbField]: tv }).eq('id', alt.entityId).eq('user_id', currentUid);
         break;
       }
       case 'proposta': {
-        const dbMap = { clienteNome:'cliente_nome', clienteCnpj:'cliente_cnpj', clienteEndereco:'cliente_endereco', margemLucro:'margem_lucro', impostos:'impostos', condicoesPagamento:'condicoes_pagamento', valorProposto:'valor_proposto', observacoes:'observacoes', obraId:'obra_id', orcamentoId:'orcamento_id', nome:'nome' };
+        const dbMap = { clienteNome:'cliente_nome', clienteCnpj:'cliente_cnpj', clienteEndereco:'cliente_endereco', margemLucro:'margem_lucro', impostos:'impostos', condicoesPagamento:'condicoes_pagamento', valorProposto:'valor_proposto', observacoes:'observacoes', obraId:'obra_id', orcamentoId:'orcamento_id', nome:'nome', status:'status' };
+        const dbField = dbMap[alt.campo];
+        if (!dbField) return;
         const tv = ['margemLucro','impostos','valorProposto'].includes(alt.campo) && !isNaN(valNum) ? valNum : val;
         setPropostas(prev => prev.map(p => p.id === alt.entityId ? { ...p, [alt.campo]: tv } : p));
-        await supabase.from('propostas').update({ [dbMap[alt.campo] || alt.campo]: tv }).eq('id', alt.entityId);
+        await supabase.from('propostas').update({ [dbField]: tv }).eq('id', alt.entityId).eq('user_id', currentUid);
         break;
       }
       case 'cronograma': {
         const dbMap = { etapa:'etapa', dataInicio:'data_inicio', dataFim:'data_fim', custo:'custo', progresso:'progresso', cor:'cor' };
+        const dbField = dbMap[alt.campo];
+        if (!dbField) return;
         const tv = ['custo','progresso'].includes(alt.campo) && !isNaN(valNum) ? valNum : val;
         setCronogramas(prev => prev.map(c => c.id === alt.entityId ? { ...c, [alt.campo]: tv } : c));
-        await supabase.from('cronogramas').update({ [dbMap[alt.campo] || alt.campo]: tv }).eq('id', alt.entityId);
+        await supabase.from('cronogramas').update({ [dbField]: tv }).eq('id', alt.entityId).eq('user_id', currentUid);
         break;
       }
       case 'funcionario': {
-        const dbMap = { nome:'nome', funcao:'funcao', custoDiaria:'custo_diaria', diasTrabalhados:'dias_trabalhados', obraAtualId:'obra_atual_id' };
+        const dbMap = { nome:'nome', funcao:'funcao', custoDiaria:'custo_diaria', diasTrabalhados:'dias_trabalhados', obraAtualId:'obra_atual_id', desempenho:'desempenho' };
+        const dbField = dbMap[alt.campo];
+        if (!dbField) return;
         const tv = ['custoDiaria','diasTrabalhados'].includes(alt.campo) && !isNaN(valNum) ? valNum : val;
         setFuncionarios(prev => prev.map(f => f.id === alt.entityId ? { ...f, [alt.campo]: tv } : f));
-        await supabase.from('funcionarios').update({ [dbMap[alt.campo] || alt.campo]: tv || null }).eq('id', alt.entityId);
+        await supabase.from('funcionarios').update({ [dbField]: tv || null }).eq('id', alt.entityId).eq('user_id', currentUid);
         break;
       }
       case 'catalogo': {
+        const dbField = { nome:'nome', tipo:'tipo', custo:'custo' }[alt.campo];
+        if (!dbField) return;
         const tv = alt.campo === 'custo' && !isNaN(valNum) ? valNum : val;
         setCatalogo(prev => prev.map(i => i.id === alt.entityId ? { ...i, [alt.campo]: tv } : i));
-        await supabase.from('catalogo').update({ [alt.campo]: tv }).eq('id', alt.entityId);
+        await supabase.from('catalogo').update({ [dbField]: tv }).eq('id', alt.entityId).eq('user_id', currentUid);
         break;
       }
       case 'transacao': {
+        const dbField = { descricao:'descricao', data:'data', valor:'valor', tipo:'tipo', status:'status' }[alt.campo];
+        if (!dbField) return;
         const tv = alt.campo === 'valor' && !isNaN(valNum) ? valNum : val;
         setTransacoes(prev => prev.map(t => t.id === alt.entityId ? { ...t, [alt.campo]: tv } : t));
-        await supabase.from('transacoes').update({ [alt.campo]: tv }).eq('id', alt.entityId);
+        await supabase.from('transacoes').update({ [dbField]: tv }).eq('id', alt.entityId).eq('user_id', currentUid);
         break;
       }
       default: break;
@@ -758,7 +785,7 @@ export const AppProvider = ({ children }) => {
 
   return (
     <AppContext.Provider value={{
-      isAuthenticated, authLoading, dataLoading, user, session, login, signUp, logout,
+      isAuthenticated, authLoading, dataLoading, user, login, signUp, logout,
       empresa, updateEmpresa,
       clientes, addCliente, updateCliente, deleteCliente,
       fornecedores, addFornecedor, updateFornecedor, deleteFornecedor,
