@@ -94,7 +94,7 @@ export default function ObraDetalhes() {
     addGastoDaObra(obra.id, {
       descricao: descGasto,
       valor: parseFloat(valorGasto),
-      data: dataGasto || new Date().toLocaleDateString('pt-BR'),
+      data: dataGasto || new Date().toISOString().split('T')[0],
       categoria: 'Geral'
     });
     setIsGastoModal(false);

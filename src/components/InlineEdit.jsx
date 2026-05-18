@@ -20,7 +20,8 @@ export default function InlineEdit({ value, onSave, type = 'text', options = [],
   const handleSave = () => {
     setEditing(false);
     if (tempValue !== value) {
-      onSave(type === 'number' || type === 'currency' ? parseFloat(tempValue) || 0 : tempValue);
+      const numVal = parseFloat(tempValue);
+      onSave(type === 'number' || type === 'currency' ? (isNaN(numVal) ? 0 : numVal) : tempValue);
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 1500);
     }

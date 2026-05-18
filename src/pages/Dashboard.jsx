@@ -1,18 +1,20 @@
-import React from 'react';
-import { TrendingUp, TrendingDown, DollarSign, AlertCircle, HardHat, Activity, CheckCircle, Circle, Building2, Users, FileText, ShoppingBag, ChevronRight } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { TrendingUp, TrendingDown, DollarSign, AlertCircle, HardHat, Activity, CheckCircle, Circle, Building2, Users, FileText, ShoppingBag, ChevronRight, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
+const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
 export default function Dashboard() {
-  const { obras, notificacoes, calcProgressoFinanceiro, funcionarios, cronogramas, historico, formatCurrency, empresa, clientes, listaOrcamentos } = useAppContext();
+  const { obras, notificacoes, calcProgressoFinanceiro, funcionarios, cronogramas, historico, formatCurrency, empresa, clientes, listaOrcamentos, transacoes } = useAppContext();
   const navigate = useNavigate();
 
   // ── Onboarding journey ───────────────────────────────────
   const steps = [
     { done: !!(empresa?.razaoSocial || empresa?.nomeFantasia), label: 'Cadastrar sua empresa', desc: 'Preencha os dados da sua empresa no Perfil', link: '/perfil', icon: Building2 },
     { done: funcionarios.length > 0, label: 'Cadastrar sua equipe', desc: 'Adicione seus profissionais e colaboradores', link: '/perfil', icon: Users },
-    { done: clientes.length > 0, label: 'Cadastrar clientes', desc: 'Registre seus primeiros clientes', link: '/clientes', icon: ShoppingBag },
+    { done: clientes.length > 0, label: 'Cadastrar clientes', desc: 'Registre seus primeiros clientes', link: '/contatos', icon: ShoppingBag },
     { done: listaOrcamentos.length > 0, label: 'Criar um orçamento', desc: 'Monte materiais, mão de obra e mobilização', link: '/orcamentos', icon: FileText },
     { done: obras.length > 0, label: 'Iniciar uma obra', desc: 'Crie sua primeira obra e acompanhe o progresso', link: '/obras', icon: HardHat },
   ];
@@ -30,14 +32,30 @@ export default function Dashboard() {
     return { name: o.nome.substring(0, 15), progresso: prog, orcamento: o.orcamento / 1000 };
   });
 
-  const chartData = [
-    { name: 'Jan', receitas: 40000, despesas: 24000 },
-    { name: 'Fev', receitas: 30000, despesas: 13980 },
-    { name: 'Mar', receitas: 20000, despesas: 38000 },
-    { name: 'Abr', receitas: 27800, despesas: 39080 },
-    { name: 'Mai', receitas: 68900, despesas: 48000 },
-    { name: 'Jun', receitas: 93900, despesas: 38000 },
-  ];
+  // ── Gráfico financeiro com dados reais (últimos 6 meses) ──
+  const chartData = useMemo(() => {
+    const now = new Date();
+    const months = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      months[key] = { name: MESES[d.getMonth()], receitas: 0, despesas: 0 };
+    }
+    transacoes.forEach(t => {
+      const mes = String(t.data || '').substring(0, 7);
+      if (months[mes]) {
+        if (t.tipo === 'entrada') months[mes].receitas += t.valor || 0;
+        else months[mes].despesas += t.valor || 0;
+      }
+    });
+    return Object.values(months);
+  }, [transacoes]);
+
+  // ── Obras com orçamento estourado ─────────────────────────
+  const obrasAlerta = obras.filter(o => {
+    const { progressoPerc } = calcProgressoFinanceiro(o);
+    return o.status !== 'Concluída' && progressoPerc >= 90;
+  });
 
   return (
     <div>
@@ -96,6 +114,25 @@ export default function Dashboard() {
           <p className="text-muted" style={{ fontSize: 13, marginTop: 4 }}>{funcionarios.length} profissionais</p>
         </div>
       </div>
+
+      {/* ── Alertas de obra estourada ── */}
+      {obrasAlerta.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+          {obrasAlerta.map(o => {
+            const { progressoPerc } = calcProgressoFinanceiro(o);
+            return (
+              <div key={o.id} onClick={() => navigate(`/obras/${o.id}`)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, cursor: 'pointer' }}>
+                <AlertTriangle size={18} color="var(--danger)" style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{o.nome}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-secondary)', marginLeft: 8 }}>orçamento {progressoPerc}% comprometido</span>
+                </div>
+                <span style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 600 }}>Ver obra →</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── Jornada de configuração ── */}
       {showJourney && (

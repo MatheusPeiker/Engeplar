@@ -4,8 +4,15 @@ import { useAppContext } from '../context/AppContext';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
+const STATUS_PROPOSTA = {
+  rascunho: { label: 'Rascunho',  color: 'var(--text-muted)',  bg: 'var(--background)' },
+  enviada:  { label: 'Enviada',   color: 'var(--primary)',     bg: 'var(--primary-light)' },
+  aprovada: { label: 'Aprovada',  color: 'var(--success)',     bg: 'rgba(16,185,129,0.1)' },
+  recusada: { label: 'Recusada',  color: 'var(--danger)',      bg: 'rgba(239,68,68,0.08)' },
+};
+
 export default function Proposta() {
-  const { propostas, listaOrcamentos, addObra, updateOrcamento, updateOrcamentoExtras, updateProposta, addProposta, deleteProposta, getTotalOrcamento, formatCurrency, salvarVersao } = useAppContext();
+  const { propostas, listaOrcamentos, addObra, updateOrcamento, updateOrcamentoExtras, updateProposta, addProposta, deleteProposta, getTotalOrcamento, formatCurrency, salvarVersao, empresa } = useAppContext();
   
   const [view, setView] = useState('list'); // 'list' ou 'detail'
   const [currentPId, setCurrentPId] = useState(null);
@@ -55,6 +62,48 @@ export default function Proposta() {
   const handleUpdate = (campo, valor) => {
     if (!currentPId) return;
     updateProposta(currentPId, campo, valor);
+  };
+
+  const exportarPropostaPDF = () => {
+    if (!proposta) return;
+    const orc = proposta.orcamentoId ? listaOrcamentos.find(o => o.id === proposta.orcamentoId) : null;
+    const fmt = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+    const nomeEmpresa = empresa?.nomeFantasia || empresa?.razaoSocial || 'Empresa';
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Proposta - ${proposta.nome}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:40px;color:#111;max-width:800px;margin:0 auto}
+      h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;border-bottom:2px solid #1E3A8A;padding-bottom:6px;color:#1E3A8A;margin-top:24px}
+      .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;font-size:14px}
+      .total{font-size:18px;font-weight:700;color:#1E3A8A;padding:12px 0;border-top:2px solid #1E3A8A}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px}
+      .badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:#e0f2fe;color:#1E3A8A}
+      table{width:100%;border-collapse:collapse;font-size:13px}
+      th{background:#f1f5f9;padding:8px;text-align:left;font-weight:600}
+      td{padding:8px;border-bottom:1px solid #eee}
+      @media print{button{display:none}}
+    </style></head><body>
+    <div class="header">
+      <div><h1>${proposta.nome}</h1><p style="color:#666;font-size:13px;margin-top:4px">${nomeEmpresa}</p></div>
+      <div style="text-align:right"><span class="badge">${STATUS_PROPOSTA[proposta.status]?.label || 'Rascunho'}</span><p style="font-size:12px;color:#888;margin-top:6px">${new Date().toLocaleDateString('pt-BR')}</p></div>
+    </div>
+    <h2>Cliente</h2>
+    <div class="row"><span>Razão Social</span><span>${proposta.clienteNome || '—'}</span></div>
+    <div class="row"><span>CNPJ</span><span>${proposta.clienteCnpj || '—'}</span></div>
+    <div class="row"><span>Endereço</span><span>${proposta.clienteEndereco || '—'}</span></div>
+    ${orc ? `<h2>Orçamento de Referência: ${orc.nome}</h2>
+    <table><thead><tr><th>Descrição</th><th>Qtd</th><th>Unitário</th><th>Total</th></tr></thead><tbody>
+    ${orc.itens.map(i => `<tr><td>${i.descricao}</td><td>${i.quantidade}</td><td>${fmt(i.custoUnitario)}</td><td>${fmt(i.quantidade*i.custoUnitario)}</td></tr>`).join('')}
+    </tbody></table>` : ''}
+    <h2>Valores</h2>
+    <div class="row"><span>Custo Base</span><span>${fmt(custoReal)}</span></div>
+    <div class="row"><span>Margem de Lucro</span><span>${proposta.margemLucro}%</span></div>
+    <div class="row"><span>Impostos</span><span>${proposta.impostos}%</span></div>
+    <div class="row"><span>Condições de Pagamento</span><span>${proposta.condicoesPagamento || '—'}</span></div>
+    <div class="row total"><span>Valor Total da Proposta</span><span>${fmt(valorProposto)}</span></div>
+    ${proposta.observacoes ? `<h2>Observações</h2><p style="font-size:13px;color:#444">${proposta.observacoes}</p>` : ''}
+    <script>window.onload=()=>window.print()</script></body></html>`;
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
   };
 
   const preencherMobDestino = (orcId, endereco) => {
@@ -125,7 +174,12 @@ export default function Proposta() {
                     <Trash2 size={16} />
                   </button>
                 </div>
-                <h3 style={{ fontWeight: 700, fontSize: 17, marginBottom: 4 }}>{p.nome}</h3>
+                <div className="flex justify-between items-start mb-1">
+                  <h3 style={{ fontWeight: 700, fontSize: 17 }}>{p.nome}</h3>
+                  {(() => { const s = STATUS_PROPOSTA[p.status] || STATUS_PROPOSTA.rascunho; return (
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 20, background: s.bg, color: s.color, flexShrink: 0 }}>{s.label}</span>
+                  ); })()}
+                </div>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>{p.clienteNome || 'Cliente não definido'}</p>
                 {orc && <p style={{ fontSize: 11, color: 'var(--primary)', marginBottom: 12, fontWeight: 600 }}>Orçamento: {orc.nome}</p>}
                 {p.obraId && <p style={{ fontSize: 11, color: 'var(--success)', marginBottom: 8, fontWeight: 600 }}>Obra gerada</p>}
@@ -162,12 +216,21 @@ export default function Proposta() {
           <div className="flex gap-6" style={{ flexWrap: 'wrap' }}>
             <div className="card flex-1" style={{ minWidth: '55%' }}>
               <div className="flex justify-between items-center mb-6">
-                <h3 style={{ fontWeight: 700, fontSize: 18 }}>
-                   <InlineEdit value={proposta.nome} onSave={v => handleUpdate('nome', v)} />
-                </h3>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>
+                     <InlineEdit value={proposta.nome} onSave={v => handleUpdate('nome', v)} />
+                  </h3>
+                  <select
+                    value={proposta.status || 'rascunho'}
+                    onChange={e => handleUpdate('status', e.target.value)}
+                    style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20, border: `1px solid ${STATUS_PROPOSTA[proposta.status]?.color || 'var(--border)'}`, color: STATUS_PROPOSTA[proposta.status]?.color || 'var(--text-muted)', background: STATUS_PROPOSTA[proposta.status]?.bg || 'var(--background)', cursor: 'pointer', outline: 'none' }}
+                  >
+                    {Object.entries(STATUS_PROPOSTA).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </div>
                 <div className="flex gap-2">
                    <button className="btn btn-secondary btn-sm" onClick={() => salvarVersao('proposta', proposta.id, proposta, null)}><Save size={14} /> Salvar Versão</button>
-                   <button className="btn btn-secondary btn-sm"><Download size={14} /> PDF</button>
+                   <button className="btn btn-secondary btn-sm" onClick={exportarPropostaPDF}><Download size={14} /> PDF</button>
                 </div>
               </div>
 

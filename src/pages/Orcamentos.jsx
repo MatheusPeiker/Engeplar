@@ -68,6 +68,47 @@ export default function Orcamentos() {
   const mergeExtras = (partial) =>
     updateOrcamentoExtras(currentOrcId, { ...(currentOrc?.extras || {}), ...partial });
 
+  const exportarOrcamentoPDF = () => {
+    if (!currentOrc) return;
+    const fmt = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+    const obraVinculada = currentOrc.obraId ? obras.find(o => o.id === currentOrc.obraId)?.nome : null;
+    const nomeEmpresa = empresa?.nomeFantasia || empresa?.razaoSocial || 'Empresa';
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orçamento - ${currentOrc.nome}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:40px;color:#111;max-width:860px;margin:0 auto}
+      h1{font-size:22px;margin-bottom:4px}h2{font-size:14px;border-bottom:2px solid #1E3A8A;padding-bottom:5px;color:#1E3A8A;margin:20px 0 10px}
+      table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px}
+      th{background:#f1f5f9;padding:8px 10px;text-align:left;font-weight:600;border-bottom:2px solid #e2e8f0}
+      td{padding:7px 10px;border-bottom:1px solid #f1f5f9}
+      .right{text-align:right}.total-row td{font-weight:700;background:#f8fafc;border-top:2px solid #e2e8f0}
+      .grand-total{display:flex;justify-content:flex-end;gap:40px;padding:14px 10px;background:#1E3A8A;color:white;border-radius:8px;margin-top:16px}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:16px;border-bottom:2px solid #e2e8f0}
+      @media print{button{display:none}}
+    </style></head><body>
+    <div class="header">
+      <div><h1>${currentOrc.nome}</h1><p style="color:#666;font-size:13px;margin-top:4px">${nomeEmpresa}</p>${obraVinculada ? `<p style="font-size:12px;color:#1E3A8A;margin-top:2px">Obra: ${obraVinculada}</p>` : ''}</div>
+      <p style="font-size:12px;color:#888">${new Date().toLocaleDateString('pt-BR')}</p>
+    </div>
+    ${items.length > 0 ? `<h2>Materiais e Serviços</h2>
+    <table><thead><tr><th>Descrição</th><th>Categoria</th><th>Unid.</th><th class="right">Qtd</th><th class="right">Unitário</th><th class="right">Total</th></tr></thead>
+    <tbody>${items.map(i => `<tr><td>${i.descricao}</td><td>${i.categoria||''}</td><td>${i.unidade||''}</td><td class="right">${i.quantidade}</td><td class="right">${fmt(i.custoUnitario)}</td><td class="right">${fmt(i.quantidade*i.custoUnitario)}</td></tr>`).join('')}
+    <tr class="total-row"><td colspan="5" class="right">Subtotal Materiais</td><td class="right">${fmt(totalItens)}</td></tr></tbody></table>` : ''}
+    ${maoDeObra.length > 0 ? `<h2>Mão de Obra</h2>
+    <table><thead><tr><th>Profissional</th><th>Função</th><th class="right">Dias</th><th class="right">Custo/Dia</th><th class="right">Subtotal</th></tr></thead>
+    <tbody>${maoDeObra.map(m => `<tr><td>${m.nome}</td><td>${m.funcao||''}</td><td class="right">${m.diasPrevistos}</td><td class="right">${fmt(m.custoDiaria)}</td><td class="right">${fmt(m.custoDiaria*m.diasPrevistos)}</td></tr>`).join('')}
+    <tr class="total-row"><td colspan="4" class="right">Subtotal M.O.</td><td class="right">${fmt(totalMO)}</td></tr></tbody></table>` : ''}
+    ${totalMob > 0 ? `<h2>Mobilização</h2>
+    <table><thead><tr><th>Descrição</th><th class="right">Valor</th></tr></thead><tbody>
+    ${mob.veiculo ? `<tr><td>Veículo</td><td class="right">${mob.veiculo}</td></tr>` : ''}
+    ${mob.enderecoDestino ? `<tr><td>Destino</td><td class="right">${mob.enderecoDestino}</td></tr>` : ''}
+    ${mob.distanciaKm ? `<tr><td>Distância</td><td class="right">${mob.distanciaKm} km</td></tr>` : ''}
+    <tr class="total-row"><td class="right">Subtotal Mobilização</td><td class="right">${fmt(totalMob)}</td></tr></tbody></table>` : ''}
+    <div class="grand-total"><span style="font-size:15px;opacity:.8">TOTAL GERAL</span><span style="font-size:22px;font-weight:800">${fmt(grandTotal)}</span></div>
+    <script>window.onload=()=>window.print()</script></body></html>`;
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
+  };
+
   const saveMob = (newMob) => {
     const parsed = {
       ...newMob,
@@ -498,7 +539,7 @@ export default function Orcamentos() {
                 )}
               </div>
             </div>
-            <button className="btn btn-secondary" style={{ width: '100%' }}>
+            <button className="btn btn-secondary" style={{ width: '100%' }} onClick={exportarOrcamentoPDF}>
               <Download size={16} /> Exportar PDF
             </button>
           </div>

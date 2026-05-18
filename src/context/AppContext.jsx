@@ -36,7 +36,8 @@ const norm = {
     id: r.id, nome: r.nome, obraId: r.obra_id, orcamentoId: r.orcamento_id,
     clienteNome: r.cliente_nome, clienteCnpj: r.cliente_cnpj, clienteEndereco: r.cliente_endereco,
     margemLucro: r.margem_lucro ?? 20, impostos: r.impostos ?? 6,
-    condicoesPagamento: r.condicoes_pagamento, valorProposto: r.valor_proposto, observacoes: r.observacoes
+    condicoesPagamento: r.condicoes_pagamento, valorProposto: r.valor_proposto,
+    observacoes: r.observacoes, status: r.status || 'rascunho'
   }),
   historico: (r) => ({
     id: r.id, modulo: r.modulo, campo: r.campo,
@@ -443,7 +444,7 @@ export const AppProvider = ({ children }) => {
   // ── Propostas ─────────────────────────────────────────────
   const addProposta = async (nome, obraId = null) => {
     const tempId = `tmp_${Date.now()}`;
-    const local = { id: tempId, nome, obraId, orcamentoId: null, clienteNome: '', clienteCnpj: '', clienteEndereco: '', margemLucro: 20, impostos: 6, condicoesPagamento: '30 dias', valorProposto: null, observacoes: '' };
+    const local = { id: tempId, nome, obraId, orcamentoId: null, clienteNome: '', clienteCnpj: '', clienteEndereco: '', margemLucro: 20, impostos: 6, condicoesPagamento: '30 dias', valorProposto: null, observacoes: '', status: 'rascunho' };
     setPropostas(prev => [local, ...prev]);
     const { data, error } = await supabase.from('propostas').insert({ nome, obra_id: obraId || null, user_id: uid() }).select().single();
     if (error) { setPropostas(prev => prev.filter(p => p.id !== tempId)); return tempId; }
@@ -462,7 +463,7 @@ export const AppProvider = ({ children }) => {
       nome: 'nome', obraId: 'obra_id', orcamentoId: 'orcamento_id',
       clienteNome: 'cliente_nome', clienteCnpj: 'cliente_cnpj', clienteEndereco: 'cliente_endereco',
       margemLucro: 'margem_lucro', impostos: 'impostos', condicoesPagamento: 'condicoes_pagamento',
-      valorProposto: 'valor_proposto', observacoes: 'observacoes'
+      valorProposto: 'valor_proposto', observacoes: 'observacoes', status: 'status'
     };
     await supabase.from('propostas').update({ [dbMap[campo] || campo]: valor }).eq('id', propostaId);
   }, [registrarAlteracao]);
