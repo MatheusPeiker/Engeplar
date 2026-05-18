@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { ArrowLeft, Plus, Trash2, MapPin, Calendar, FileText, DollarSign, Users, UserPlus, UserMinus, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, MapPin, Calendar, FileText, DollarSign, Users, UserPlus, UserMinus, CheckCircle, AlertCircle, Download, ExternalLink } from 'lucide-react';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
@@ -17,7 +17,7 @@ export default function ObraDetalhes() {
     getArquivosObra, addArquivo, deleteArquivo,
     getPropostaObra,
     funcionarios, updateFuncionario,
-    formatCurrency
+    formatCurrency, empresa
   } = useAppContext();
 
   const obra = obras.find(o => o.id === id);
@@ -59,6 +59,134 @@ export default function ObraDetalhes() {
   const funcionariosSemObra = funcionarios.filter(f => !f.obraAtualId || f.obraAtualId !== id);
 
   const hoje = new Date().toISOString().split('T')[0];
+
+  const STATUS_PROPOSTA = {
+    rascunho: { label: 'Rascunho',  color: 'var(--text-muted)',  bg: 'var(--background)' },
+    enviada:  { label: 'Enviada',   color: 'var(--primary)',     bg: 'var(--primary-light)' },
+    aprovada: { label: 'Aprovada',  color: 'var(--success)',     bg: 'rgba(16,185,129,0.1)' },
+    recusada: { label: 'Recusada',  color: 'var(--danger)',      bg: 'rgba(239,68,68,0.08)' },
+  };
+
+  const exportarPropostaDaObraPDF = () => {
+    if (!propostaPrincipal) return;
+    const p = propostaPrincipal;
+    const margem = parseFloat(p.margemLucro) || 0;
+    const impostos = parseFloat(p.impostos) || 0;
+    const base = p.valorProposto || totalOrc;
+    const valorComMargem = base * (1 + margem / 100);
+    const valorFinal = valorComMargem * (1 + impostos / 100);
+    const fmt = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const linhasItens = orcItens.map(i => `
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${i.descricao}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;">${i.unidade}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${i.quantidade}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${fmt(i.custoUnitario)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(i.quantidade * i.custoUnitario)}</td>
+      </tr>`).join('');
+    const linhasMO = orcMO.map(m => `
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${m.nome}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${m.funcao}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;">${m.diasPrevistos} dias</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${fmt(m.custoDiaria)}/dia</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(m.custoDiaria * m.diasPrevistos)}</td>
+      </tr>`).join('');
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+      <title>Proposta — ${p.nome}</title>
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#1f2937;background:#fff;padding:40px;}
+        .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:24px;border-bottom:3px solid #1E3A8A;}
+        .logo-area h1{font-size:22px;font-weight:800;color:#1E3A8A;letter-spacing:-0.5px;}
+        .logo-area p{font-size:11px;color:#6b7280;margin-top:2px;}
+        .proposta-info{text-align:right;}
+        .proposta-info h2{font-size:18px;font-weight:700;color:#1E3A8A;}
+        .proposta-info p{font-size:11px;color:#6b7280;margin-top:2px;}
+        .cliente-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:24px;}
+        .cliente-box h3{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:8px;}
+        .cliente-box p{font-size:14px;font-weight:600;color:#111827;}
+        .cliente-box span{font-size:12px;color:#6b7280;}
+        section{margin-bottom:24px;}
+        section h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:8px;font-weight:600;}
+        table{width:100%;border-collapse:collapse;}
+        thead tr{background:#1E3A8A;color:#fff;}
+        thead th{padding:9px 12px;text-align:left;font-size:12px;font-weight:600;}
+        thead th:last-child{text-align:right;}
+        thead th:nth-child(3),thead th:nth-child(4){text-align:right;}
+        .totals{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:24px;}
+        .totals-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;}
+        .totals-row.final{padding-top:10px;margin-top:6px;border-top:2px solid #1E3A8A;font-size:16px;font-weight:800;color:#1E3A8A;}
+        .obs{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;font-size:12px;color:#78350f;line-height:1.5;}
+        .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-size:11px;color:#9ca3af;}
+        @media print{body{padding:20px;}}
+      </style></head><body>
+      <div class="header">
+        <div class="logo-area">
+          <h1>${empresa?.nomeFantasia || empresa?.razaoSocial || 'Minha Empresa'}</h1>
+          <p>${empresa?.cnpj ? 'CNPJ: ' + empresa.cnpj : ''}</p>
+          <p>${empresa?.endereco || ''}</p>
+          <p>${empresa?.telefone || ''} ${empresa?.email ? '· ' + empresa.email : ''}</p>
+        </div>
+        <div class="proposta-info">
+          <h2>PROPOSTA COMERCIAL</h2>
+          <p>${p.nome}</p>
+          <p>Data: ${new Date().toLocaleDateString('pt-BR')}</p>
+          ${p.condicoesPagamento ? `<p style="margin-top:4px;font-size:10px;color:#374151;">Pagamento: ${p.condicoesPagamento}</p>` : ''}
+        </div>
+      </div>
+
+      <div class="cliente-box">
+        <h3>Cliente</h3>
+        <p>${p.clienteNome || 'A definir'}</p>
+        ${p.clienteCnpj ? `<span>CNPJ: ${p.clienteCnpj}</span>` : ''}
+        ${p.clienteEndereco ? `<br/><span>${p.clienteEndereco}</span>` : ''}
+      </div>
+
+      ${orcItens.length > 0 ? `<section>
+        <h3>Materiais e Serviços</h3>
+        <table>
+          <thead><tr><th>Descrição</th><th>Unid.</th><th style="text-align:right">Qtd.</th><th style="text-align:right">Unit.</th><th style="text-align:right">Total</th></tr></thead>
+          <tbody>${linhasItens}<tr style="background:#f3f4f6;font-weight:700;"><td colspan="4" style="padding:8px 12px;text-align:right;font-size:12px;">Subtotal</td><td style="padding:8px 12px;text-align:right;">${fmt(totalItens)}</td></tr></tbody>
+        </table>
+      </section>` : ''}
+
+      ${orcMO.length > 0 ? `<section>
+        <h3>Mão de Obra</h3>
+        <table>
+          <thead><tr><th>Profissional</th><th>Função</th><th style="text-align:right">Período</th><th style="text-align:right">Custo</th><th style="text-align:right">Total</th></tr></thead>
+          <tbody>${linhasMO}<tr style="background:#f3f4f6;font-weight:700;"><td colspan="4" style="padding:8px 12px;text-align:right;font-size:12px;">Subtotal</td><td style="padding:8px 12px;text-align:right;">${fmt(totalMO)}</td></tr></tbody>
+        </table>
+      </section>` : ''}
+
+      ${totalMob > 0 ? `<section>
+        <h3>Mobilização</h3>
+        <table>
+          <thead><tr><th>Item</th><th colspan="3"></th><th style="text-align:right">Valor</th></tr></thead>
+          <tbody>
+            ${orcMob.veiculo ? `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">Veículo: ${orcMob.veiculo}</td><td colspan="3" style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${orcMob.distanciaKm} km · ${orcMob.numViagens} viagen(s)</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(totalMob)}</td></tr>` : ''}
+          </tbody>
+        </table>
+      </section>` : ''}
+
+      <div class="totals">
+        <div class="totals-row"><span>Custo Base</span><span>${fmt(totalOrc)}</span></div>
+        ${margem > 0 ? `<div class="totals-row"><span>Margem de Lucro (${margem}%)</span><span>+ ${fmt(totalOrc * margem / 100)}</span></div>` : ''}
+        ${impostos > 0 ? `<div class="totals-row"><span>Impostos (${impostos}%)</span><span>+ ${fmt(valorComMargem * impostos / 100)}</span></div>` : ''}
+        <div class="totals-row final"><span>VALOR TOTAL DA PROPOSTA</span><span>${fmt(valorFinal)}</span></div>
+      </div>
+
+      ${p.observacoes ? `<div class="obs"><strong>Observações:</strong> ${p.observacoes}</div>` : ''}
+
+      <div class="footer">
+        <span>${empresa?.nomeFantasia || empresa?.razaoSocial || ''}</span>
+        <span>Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+      </div>
+      <script>window.onload=()=>window.print();</script>
+      </body></html>`;
+    const w = window.open('', '_blank');
+    if (w) { w.document.write(html); w.document.close(); }
+  };
 
   const abrirFinalizar = () => {
     setFinGastos([{ desc: '', valor: '', data: hoje }]);
@@ -163,7 +291,7 @@ export default function ObraDetalhes() {
 
       {/* Tabs */}
       <div className="tabs-container">
-        {['resumo', 'equipe', 'gastos', 'orcamento', 'cronograma', 'arquivos'].map(t => (
+        {['resumo', 'proposta', 'equipe', 'gastos', 'orcamento', 'cronograma', 'arquivos'].map(t => (
           <button key={t} className={`tab-btn ${aba === t ? 'active' : ''}`} onClick={() => setAba(t)} style={{ textTransform: 'capitalize' }}>{t}</button>
         ))}
       </div>
@@ -241,6 +369,203 @@ export default function ObraDetalhes() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* === PROPOSTA === */}
+      {aba === 'proposta' && (
+        <div>
+          {!propostaPrincipal ? (
+            <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <FileText size={36} style={{ marginBottom: 12, opacity: .35 }} />
+              <p style={{ fontWeight: 600, fontSize: 15 }}>Nenhuma proposta vinculada</p>
+              <p style={{ fontSize: 13, marginTop: 6, maxWidth: 340, margin: '6px auto 0' }}>
+                Crie uma proposta na página{' '}
+                <span style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }} onClick={() => navigate('/proposta')}>Propostas</span>
+                {' '}e vincule-a a esta obra.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Header da proposta */}
+              <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                      <h3 style={{ fontWeight: 700, fontSize: 17 }}>{propostaPrincipal.nome}</h3>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                        color: STATUS_PROPOSTA[propostaPrincipal.status]?.color || 'var(--text-muted)',
+                        background: STATUS_PROPOSTA[propostaPrincipal.status]?.bg || 'var(--background)',
+                        border: `1px solid ${STATUS_PROPOSTA[propostaPrincipal.status]?.color || 'var(--border)'}22`
+                      }}>
+                        {STATUS_PROPOSTA[propostaPrincipal.status]?.label || propostaPrincipal.status}
+                      </span>
+                    </div>
+                    {propostaPrincipal.condicoesPagamento && (
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        Pagamento: {propostaPrincipal.condicoesPagamento}
+                      </p>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => navigate('/proposta')}>
+                      <ExternalLink size={14} /> Abrir Proposta
+                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={exportarPropostaDaObraPDF}>
+                      <Download size={14} /> Exportar PDF
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cliente */}
+              <div className="card" style={{ marginBottom: 16 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-muted)', marginBottom: 10 }}>Cliente</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                  <div>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Nome / Razão Social</p>
+                    <p style={{ fontWeight: 600, fontSize: 14 }}>{propostaPrincipal.clienteNome || '—'}</p>
+                  </div>
+                  {propostaPrincipal.clienteCnpj && (
+                    <div>
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>CNPJ</p>
+                      <p style={{ fontWeight: 600, fontSize: 14 }}>{propostaPrincipal.clienteCnpj}</p>
+                    </div>
+                  )}
+                  {propostaPrincipal.clienteEndereco && (
+                    <div>
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Endereço</p>
+                      <p style={{ fontWeight: 600, fontSize: 14 }}>{propostaPrincipal.clienteEndereco}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Resumo financeiro */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
+                <div className="card" style={{ padding: 16 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Custo Base</p>
+                  <p style={{ fontSize: 20, fontWeight: 700 }}>{formatCurrency(totalOrc)}</p>
+                </div>
+                {propostaPrincipal.margemLucro > 0 && (
+                  <div className="card" style={{ padding: 16 }}>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Margem de Lucro</p>
+                    <p style={{ fontSize: 20, fontWeight: 700, color: 'var(--success)' }}>{propostaPrincipal.margemLucro}%</p>
+                  </div>
+                )}
+                {propostaPrincipal.impostos > 0 && (
+                  <div className="card" style={{ padding: 16 }}>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Impostos</p>
+                    <p style={{ fontSize: 20, fontWeight: 700, color: 'var(--warning)' }}>{propostaPrincipal.impostos}%</p>
+                  </div>
+                )}
+                <div className="card" style={{ padding: 16, background: 'var(--primary)', border: 'none' }}>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,.75)', marginBottom: 4 }}>Valor da Proposta</p>
+                  <p style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>
+                    {formatCurrency(propostaPrincipal.valorProposto || (totalOrc * (1 + (propostaPrincipal.margemLucro || 0) / 100) * (1 + (propostaPrincipal.impostos || 0) / 100)))}
+                  </p>
+                </div>
+              </div>
+
+              {/* Itens */}
+              {orcItens.length > 0 && (
+                <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+                  <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13 }}>
+                    Materiais e Serviços
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="table-editable">
+                      <thead>
+                        <tr>
+                          <th>Descrição</th>
+                          <th style={{ textAlign: 'center' }}>Unid.</th>
+                          <th style={{ textAlign: 'right' }}>Qtd.</th>
+                          <th style={{ textAlign: 'right' }}>Unitário</th>
+                          <th style={{ textAlign: 'right' }}>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orcItens.map(item => (
+                          <tr key={item.id}>
+                            <td>{item.descricao}</td>
+                            <td style={{ textAlign: 'center' }}>{item.unidade}</td>
+                            <td style={{ textAlign: 'right' }}>{item.quantidade}</td>
+                            <td style={{ textAlign: 'right' }}>{formatCurrency(item.custoUnitario)}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.quantidade * item.custoUnitario)}</td>
+                          </tr>
+                        ))}
+                        <tr style={{ background: 'var(--background)', fontWeight: 700 }}>
+                          <td colSpan="4" style={{ textAlign: 'right', fontSize: 12 }}>Subtotal materiais</td>
+                          <td style={{ textAlign: 'right', color: 'var(--primary)' }}>{formatCurrency(totalItens)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Mão de Obra */}
+              {orcMO.length > 0 && (
+                <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+                  <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13, color: '#06b6d4' }}>
+                    Mão de Obra
+                  </div>
+                  <table className="table-editable">
+                    <thead>
+                      <tr>
+                        <th>Profissional</th>
+                        <th>Função</th>
+                        <th style={{ textAlign: 'center' }}>Dias</th>
+                        <th style={{ textAlign: 'right' }}>Custo/Dia</th>
+                        <th style={{ textAlign: 'right' }}>Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orcMO.map(m => (
+                        <tr key={m.funcionarioId}>
+                          <td style={{ fontWeight: 500 }}>{m.nome}</td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{m.funcao}</td>
+                          <td style={{ textAlign: 'center' }}>{m.diasPrevistos}</td>
+                          <td style={{ textAlign: 'right' }}>{formatCurrency(m.custoDiaria)}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 600, color: '#06b6d4' }}>{formatCurrency(m.custoDiaria * m.diasPrevistos)}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: 'var(--background)', fontWeight: 700 }}>
+                        <td colSpan="4" style={{ textAlign: 'right', fontSize: 12 }}>Subtotal mão de obra</td>
+                        <td style={{ textAlign: 'right', color: '#06b6d4' }}>{formatCurrency(totalMO)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Mobilização */}
+              {totalMob > 0 && (
+                <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+                  <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13, color: '#f59e0b' }}>
+                    Mobilização
+                  </div>
+                  <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, fontSize: 13 }}>
+                    {orcMob.veiculo && <div><span style={{ color: 'var(--text-muted)' }}>Veículo: </span><strong>{orcMob.veiculo}</strong></div>}
+                    {orcMob.distanciaKm && <div><span style={{ color: 'var(--text-muted)' }}>Distância: </span><strong>{orcMob.distanciaKm} km</strong></div>}
+                    {orcMob.numViagens && <div><span style={{ color: 'var(--text-muted)' }}>Viagens: </span><strong>{orcMob.numViagens}</strong></div>}
+                  </div>
+                  <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', fontWeight: 700, color: '#f59e0b' }}>
+                    Total Mobilização: {formatCurrency(totalMob)}
+                  </div>
+                </div>
+              )}
+
+              {/* Observações */}
+              {propostaPrincipal.observacoes && (
+                <div className="card" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 6 }}>Observações</p>
+                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{propostaPrincipal.observacoes}</p>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
