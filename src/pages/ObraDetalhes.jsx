@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { ArrowLeft, Plus, Trash2, MapPin, Calendar, FileText, DollarSign, Users, UserPlus, UserMinus } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, MapPin, Calendar, FileText, DollarSign, Users, UserPlus, UserMinus, CheckCircle, AlertCircle } from 'lucide-react';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
@@ -27,6 +27,12 @@ export default function ObraDetalhes() {
   const [valorGasto, setValorGasto] = useState('');
   const [dataGasto, setDataGasto] = useState('');
 
+  // Finalizar obra
+  const [isFinalizarModal, setIsFinalizarModal] = useState(false);
+  const [finGastos, setFinGastos] = useState([{ desc: '', valor: '', data: '' }]);
+  const [liberarEquipe, setLiberarEquipe] = useState(true);
+  const [finalizando, setFinalizando] = useState(false);
+
   if (!obra) return <div style={{ padding: 40 }}>Obra não encontrada!</div>;
 
   const { gasto, progressoPerc, alerta } = calcProgressoFinanceiro(obra);
@@ -51,6 +57,36 @@ export default function ObraDetalhes() {
   const progressoCrono = cronograma.length > 0 ? Math.round(cronograma.reduce((a, e) => a + e.progresso, 0) / cronograma.length) : 0;
   const equipeObra = funcionarios.filter(f => f.obraAtualId === id);
   const funcionariosSemObra = funcionarios.filter(f => !f.obraAtualId || f.obraAtualId !== id);
+
+  const hoje = new Date().toISOString().split('T')[0];
+
+  const abrirFinalizar = () => {
+    setFinGastos([{ desc: '', valor: '', data: hoje }]);
+    setLiberarEquipe(true);
+    setIsFinalizarModal(true);
+  };
+
+  const handleFinalizar = async () => {
+    setFinalizando(true);
+    for (const g of finGastos) {
+      if (g.desc.trim() && g.valor) {
+        await addGastoDaObra(obra.id, {
+          descricao: g.desc.trim(),
+          valor: parseFloat(g.valor),
+          data: g.data || hoje,
+          categoria: 'Conclusão'
+        });
+      }
+    }
+    if (liberarEquipe) {
+      for (const f of equipeObra) {
+        await updateFuncionario(f.id, 'obraAtualId', null);
+      }
+    }
+    await updateObra(id, 'status', 'Concluída');
+    setFinalizando(false);
+    setIsFinalizarModal(false);
+  };
 
   const handleAddGasto = (e) => {
     e.preventDefault();
@@ -96,6 +132,16 @@ export default function ObraDetalhes() {
           </p>
         </div>
         <InlineEdit value={obra.status} type="select" options={['Em andamento', 'Atrasada', 'Concluída', 'Pausada']} onSave={v => updateObra(id, 'status', v)} />
+        {obra.status !== 'Concluída' && (
+          <button className="btn btn-primary" onClick={abrirFinalizar} style={{ background: 'var(--success)', borderColor: 'var(--success)', whiteSpace: 'nowrap' }}>
+            <CheckCircle size={16} /> Finalizar Obra
+          </button>
+        )}
+        {obra.status === 'Concluída' && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: 'var(--success)', padding: '6px 14px', background: 'rgba(16,185,129,0.1)', borderRadius: 8, border: '1px solid rgba(16,185,129,0.3)' }}>
+            <CheckCircle size={15} /> Concluída
+          </span>
+        )}
       </div>
 
       {/* Tabs */}
@@ -466,6 +512,107 @@ export default function ObraDetalhes() {
           </div>
         </div>
       )}
+
+      {/* Modal: Finalizar Obra */}
+      <Modal isOpen={isFinalizarModal} onClose={() => setIsFinalizarModal(false)} title="Finalizar Obra">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {/* Alerta */}
+          <div style={{ display: 'flex', gap: 10, padding: '12px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8 }}>
+            <AlertCircle size={18} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              Antes de concluir, registre os gastos finais e confirme a equipe que realizou a obra. Após confirmar, o status será alterado para <strong>Concluída</strong>.
+            </p>
+          </div>
+
+          {/* Gastos finais */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <p style={{ fontWeight: 600, fontSize: 14 }}>Gastos Finais</p>
+              <button className="btn btn-secondary btn-sm" onClick={() => setFinGastos(p => [...p, { desc: '', valor: '', data: hoje }])}>
+                <Plus size={13} /> Adicionar linha
+              </button>
+            </div>
+            {obra.gastosDespesas.length > 0 && (
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+                {obra.gastosDespesas.length} gasto(s) já registrado(s) · Total: {formatCurrency(obra.gastosDespesas.reduce((a, g) => a + g.valor, 0))}
+              </p>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {finGastos.map((g, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 110px 28px', gap: 6, alignItems: 'center' }}>
+                  <input
+                    type="text" placeholder="Descrição do gasto"
+                    value={g.desc}
+                    onChange={e => setFinGastos(p => p.map((x, j) => j === i ? { ...x, desc: e.target.value } : x))}
+                    style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, outline: 'none' }}
+                  />
+                  <input
+                    type="number" placeholder="Valor" step="0.01" min="0"
+                    value={g.valor}
+                    onChange={e => setFinGastos(p => p.map((x, j) => j === i ? { ...x, valor: e.target.value } : x))}
+                    style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, outline: 'none' }}
+                  />
+                  <input
+                    type="date"
+                    value={g.data}
+                    onChange={e => setFinGastos(p => p.map((x, j) => j === i ? { ...x, data: e.target.value } : x))}
+                    style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, outline: 'none' }}
+                  />
+                  <button className="icon-btn text-danger" onClick={() => setFinGastos(p => p.filter((_, j) => j !== i))} disabled={finGastos.length === 1}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Equipe realizada */}
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Equipe que Realizou</p>
+            {(() => {
+              const moList = orcMO.map(m => ({ id: m.funcionarioId, nome: m.nome, funcao: m.funcao, origem: 'orçamento', dias: m.diasPrevistos }));
+              const alocList = equipeObra.filter(f => !orcMO.find(m => m.funcionarioId === f.id)).map(f => ({ id: f.id, nome: f.nome, funcao: f.funcao, origem: 'alocado', dias: f.diasTrabalhados }));
+              const todos = [...moList, ...alocList];
+              if (todos.length === 0) return <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Nenhum profissional associado a esta obra.</p>;
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {todos.map(f => (
+                    <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--background)', borderRadius: 8 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                        {f.nome.charAt(0)}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontWeight: 600, fontSize: 13 }}>{f.nome}</p>
+                        <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{f.funcao} · {f.dias} dias · via {f.origem}</p>
+                      </div>
+                      <CheckCircle size={16} color="var(--success)" />
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Opção liberar equipe */}
+          {equipeObra.length > 0 && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
+              <input type="checkbox" checked={liberarEquipe} onChange={e => setLiberarEquipe(e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+              <span>Liberar equipe alocada desta obra após conclusão ({equipeObra.length} profissional{equipeObra.length > 1 ? 'is' : ''})</span>
+            </label>
+          )}
+
+          {/* Confirmar */}
+          <button
+            className="btn btn-primary"
+            onClick={handleFinalizar}
+            disabled={finalizando}
+            style={{ width: '100%', background: 'var(--success)', borderColor: 'var(--success)', fontSize: 15, padding: '12px 0' }}
+          >
+            <CheckCircle size={16} /> {finalizando ? 'Finalizando...' : 'Confirmar e Marcar como Concluída'}
+          </button>
+        </div>
+      </Modal>
 
       {/* Modal: Novo Gasto */}
       <Modal isOpen={isGastoModal} onClose={() => setIsGastoModal(false)} title="Registrar Gasto">
