@@ -1,21 +1,19 @@
 import React, { useState } from 'react';
-import { Plus, Search, MapPin, Trash2, AlertTriangle, CheckCircle, Clock, Users, Pause } from 'lucide-react';
+import { Plus, Search, MapPin, Trash2, CheckCircle, Clock, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
 const STATUS_ICON = {
+  'Planejamento': <Clock size={13} />,
   'Em andamento': <Clock size={13} />,
-  'Atrasada':     <AlertTriangle size={13} />,
   'Concluída':    <CheckCircle size={13} />,
-  'Pausada':      <Pause size={13} />,
 };
 const STATUS_COLOR = {
+  'Planejamento': 'var(--text-muted)',
   'Em andamento': 'var(--primary)',
-  'Atrasada':     'var(--danger)',
   'Concluída':    'var(--success)',
-  'Pausada':      'var(--text-muted)',
 };
 
 export default function Obras() {
@@ -123,9 +121,20 @@ export default function Obras() {
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: STATUS_COLOR[obra.status], background: `${STATUS_COLOR[obra.status]}18`, padding: '3px 10px', borderRadius: 20 }}>
-                    {STATUS_ICON[obra.status]} {obra.status}
-                  </span>
+                  {concluida ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: STATUS_COLOR['Concluída'], background: `${STATUS_COLOR['Concluída']}18`, padding: '3px 10px', borderRadius: 20 }}>
+                      <CheckCircle size={13} /> Concluída
+                    </span>
+                  ) : (
+                    <select
+                      value={obra.status}
+                      onChange={e => updateObra(obra.id, 'status', e.target.value)}
+                      style={{ fontSize: 12, fontWeight: 600, padding: '3px 8px', borderRadius: 20, border: `1px solid ${STATUS_COLOR[obra.status] || 'var(--border)'}`, color: STATUS_COLOR[obra.status] || 'var(--text-secondary)', background: `${STATUS_COLOR[obra.status] || '#888'}18`, cursor: 'pointer', outline: 'none' }}
+                    >
+                      <option value="Planejamento">Planejamento</option>
+                      <option value="Em andamento">Em andamento</option>
+                    </select>
+                  )}
                   {!concluida && (
                     <button className="icon-btn" style={{ color: 'var(--danger)' }} onClick={() => { if (confirm('Remover obra?')) deleteObra(obra.id); }}>
                       <Trash2 size={15} />

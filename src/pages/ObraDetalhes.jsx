@@ -136,15 +136,26 @@ export default function ObraDetalhes() {
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: 'var(--success)', padding: '6px 14px', background: 'rgba(16,185,129,0.1)', borderRadius: 8, border: '1px solid rgba(16,185,129,0.3)' }}>
               <CheckCircle size={15} /> Concluída
             </span>
-            <button className="btn btn-secondary btn-sm" onClick={() => updateObra(id, 'status', 'Em andamento')} title="Reabrir obra">
+            <button className="btn btn-secondary btn-sm" onClick={() => updateObra(id, 'status', 'Em andamento')}>
               Reabrir
             </button>
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <InlineEdit value={obra.status} type="select" options={['Em andamento', 'Atrasada', 'Pausada']} onSave={v => updateObra(id, 'status', v)} />
-            <button className="btn btn-primary" onClick={abrirFinalizar} style={{ background: 'var(--success)', borderColor: 'var(--success)', whiteSpace: 'nowrap' }}>
-              <CheckCircle size={16} /> Finalizar Obra
+            <select
+              value={obra.status}
+              onChange={e => updateObra(id, 'status', e.target.value)}
+              style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 13, fontWeight: 600, cursor: 'pointer', outline: 'none' }}
+            >
+              <option value="Planejamento">Planejamento</option>
+              <option value="Em andamento">Em andamento</option>
+            </select>
+            <button
+              className="btn btn-primary"
+              onClick={abrirFinalizar}
+              style={{ background: 'var(--success)', borderColor: 'var(--success)', whiteSpace: 'nowrap', fontWeight: 700, padding: '8px 18px' }}
+            >
+              <CheckCircle size={16} /> Concluir Obra
             </button>
           </div>
         )}
@@ -162,16 +173,20 @@ export default function ObraDetalhes() {
         <div>
           {/* CTA Finalizar Obra — destaque no topo do resumo */}
           {obra.status !== 'Concluída' && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 20px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <CheckCircle size={20} color="var(--success)" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '16px 20px', background: 'rgba(16,185,129,0.1)', border: '2px solid rgba(16,185,129,0.4)', borderRadius: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <CheckCircle size={24} color="var(--success)" />
                 <div>
-                  <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--success)' }}>Obra concluída?</p>
-                  <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Registre os gastos finais e confirme a equipe antes de fechar.</p>
+                  <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--success)' }}>Obra finalizada?</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Clique em Concluir para registrar gastos finais e encerrar a obra.</p>
                 </div>
               </div>
-              <button className="btn btn-primary" onClick={abrirFinalizar} style={{ background: 'var(--success)', borderColor: 'var(--success)', whiteSpace: 'nowrap' }}>
-                <CheckCircle size={15} /> Finalizar Obra
+              <button
+                className="btn btn-primary"
+                onClick={abrirFinalizar}
+                style={{ background: 'var(--success)', borderColor: 'var(--success)', whiteSpace: 'nowrap', fontWeight: 700, fontSize: 14, padding: '10px 22px' }}
+              >
+                <CheckCircle size={16} /> Concluir Obra
               </button>
             </div>
           )}
