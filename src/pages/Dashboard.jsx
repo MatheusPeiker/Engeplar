@@ -1,12 +1,23 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, DollarSign, AlertCircle, HardHat, Activity } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { TrendingUp, TrendingDown, DollarSign, AlertCircle, HardHat, Activity, CheckCircle, Circle, Building2, Users, FileText, ShoppingBag, ChevronRight } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
-  const { obras, notificacoes, calcProgressoFinanceiro, funcionarios, cronogramas, historico, formatCurrency } = useAppContext();
+  const { obras, notificacoes, calcProgressoFinanceiro, funcionarios, cronogramas, historico, formatCurrency, empresa, clientes, listaOrcamentos } = useAppContext();
   const navigate = useNavigate();
+
+  // ── Onboarding journey ───────────────────────────────────
+  const steps = [
+    { done: !!(empresa?.razaoSocial || empresa?.nomeFantasia), label: 'Cadastrar sua empresa', desc: 'Preencha os dados da sua empresa no Perfil', link: '/perfil', icon: Building2 },
+    { done: funcionarios.length > 0, label: 'Cadastrar sua equipe', desc: 'Adicione seus profissionais e colaboradores', link: '/perfil', icon: Users },
+    { done: clientes.length > 0, label: 'Cadastrar clientes', desc: 'Registre seus primeiros clientes', link: '/clientes', icon: ShoppingBag },
+    { done: listaOrcamentos.length > 0, label: 'Criar um orçamento', desc: 'Monte materiais, mão de obra e mobilização', link: '/orcamentos', icon: FileText },
+    { done: obras.length > 0, label: 'Iniciar uma obra', desc: 'Crie sua primeira obra e acompanhe o progresso', link: '/obras', icon: HardHat },
+  ];
+  const completedCount = steps.filter(s => s.done).length;
+  const showJourney = completedCount < steps.length;
 
   const orcamentoGlobal = obras.reduce((acc, curr) => acc + curr.orcamento, 0);
   const gastoGlobal = obras.reduce((acc, curr) => acc + calcProgressoFinanceiro(curr).gasto, 0);
@@ -85,6 +96,48 @@ export default function Dashboard() {
           <p className="text-muted" style={{ fontSize: 13, marginTop: 4 }}>{funcionarios.length} profissionais</p>
         </div>
       </div>
+
+      {/* ── Jornada de configuração ── */}
+      {showJourney && (
+        <div className="card" style={{ marginBottom: 24, padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div>
+              <h3 style={{ fontWeight: 700, fontSize: 16 }}>Primeiros Passos</h3>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>Complete sua configuração para começar a usar o sistema</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: 22, fontWeight: 800, color: 'var(--primary)' }}>{completedCount}/{steps.length}</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>concluídos</p>
+            </div>
+          </div>
+          {/* Barra de progresso */}
+          <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ width: `${(completedCount / steps.length) * 100}%`, height: '100%', background: 'var(--primary)', borderRadius: 4, transition: 'width .5s' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {steps.map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <div
+                  key={i}
+                  onClick={() => !s.done && navigate(s.link)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: s.done ? 'rgba(16,185,129,0.06)' : 'var(--background)', border: `1px solid ${s.done ? 'rgba(16,185,129,0.2)' : 'var(--border)'}`, cursor: s.done ? 'default' : 'pointer', transition: 'opacity .2s' }}
+                >
+                  {s.done
+                    ? <CheckCircle size={20} color="var(--success)" style={{ flexShrink: 0 }} />
+                    : <Circle size={20} color="var(--border)" style={{ flexShrink: 0 }} />
+                  }
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 600, fontSize: 14, color: s.done ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: s.done ? 'line-through' : 'none' }}>{s.label}</p>
+                    {!s.done && <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.desc}</p>}
+                  </div>
+                  {!s.done && <ChevronRight size={16} color="var(--text-muted)" />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-6" style={{ flexWrap: 'wrap' }}>
         {/* Gráfico */}

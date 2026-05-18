@@ -21,6 +21,8 @@ export default function Orcamentos() {
     addOrcamento, updateOrcamento, deleteOrcamento,
     addOrcamentoItem, updateOrcamentoItem, deleteOrcamentoItem,
     updateOrcamentoExtras,
+    clientes, addCliente,
+    catalogo, addCatalogoItem,
     formatCurrency,
   } = useAppContext();
 
@@ -146,6 +148,12 @@ export default function Orcamentos() {
       const endereco = `${data.logradouro}, ${data.numero}${data.complemento ? ' - ' + data.complemento : ''} - ${data.bairro} - ${data.municipio}/${data.uf}`;
       const novoCli = { ...cli, cnpj, nome: data.razao_social, endereco };
       setCli(novoCli);
+      // Auto-register client if not yet in the clients list
+      const cleanForCheck = clean;
+      const jaTemCliente = clientes.find(c => (c.cnpj || '').replace(/\D/g, '') === cleanForCheck);
+      if (!jaTemCliente) {
+        addCliente({ nome: data.razao_social, cnpj, endereco, tipo: 'PJ', telefone: data.ddd_telefone_1?.trim() || '', email: data.email?.toLowerCase() || '' });
+      }
       // Calculate distance with the new address
       setCalcLoading(true);
       let distKm = null;
@@ -265,7 +273,12 @@ export default function Orcamentos() {
                 <tbody>
                   {items.map(item => (
                     <tr key={item.id}>
-                      <td><InlineEdit value={item.descricao} onSave={v => updateOrcamentoItem(currentOrc.id, item.id, 'descricao', v)} /></td>
+                      <td><InlineEdit value={item.descricao} onSave={v => {
+                        updateOrcamentoItem(currentOrc.id, item.id, 'descricao', v);
+                        if (v && v !== 'Novo Item' && !catalogo.find(c => c.nome.toLowerCase() === v.toLowerCase())) {
+                          addCatalogoItem({ nome: v, tipo: item.categoria || 'Material', custo: item.custoUnitario });
+                        }
+                      }} /></td>
                       <td><InlineEdit value={item.unidade} onSave={v => updateOrcamentoItem(currentOrc.id, item.id, 'unidade', v)} /></td>
                       <td style={{ textAlign: 'center' }}><InlineEdit value={item.quantidade} type="number" onSave={v => updateOrcamentoItem(currentOrc.id, item.id, 'quantidade', v)} /></td>
                       <td style={{ textAlign: 'right' }}><InlineEdit value={item.custoUnitario} type="currency" onSave={v => updateOrcamentoItem(currentOrc.id, item.id, 'custoUnitario', v)} /></td>

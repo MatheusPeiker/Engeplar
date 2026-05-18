@@ -160,6 +160,22 @@ export default function ObraDetalhes() {
       {/* === RESUMO === */}
       {aba === 'resumo' && (
         <div>
+          {/* CTA Finalizar Obra — destaque no topo do resumo */}
+          {obra.status !== 'Concluída' && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 20px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <CheckCircle size={20} color="var(--success)" />
+                <div>
+                  <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--success)' }}>Obra concluída?</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Registre os gastos finais e confirme a equipe antes de fechar.</p>
+                </div>
+              </div>
+              <button className="btn btn-primary" onClick={abrirFinalizar} style={{ background: 'var(--success)', borderColor: 'var(--success)', whiteSpace: 'nowrap' }}>
+                <CheckCircle size={15} /> Finalizar Obra
+              </button>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 24 }}>
             <div className="card" style={{ background: 'var(--primary)', color: 'white', border: 'none' }}>
               <p style={{ opacity: .8, fontSize: 13, marginBottom: 4 }}>Orçamento</p>
