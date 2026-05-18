@@ -63,7 +63,8 @@ export default function Orcamentos() {
     : 0;
   const grandTotal = totalItens + totalMO + totalMob;
 
-  const updateExtras = (newExtras) => updateOrcamentoExtras(currentOrcId, newExtras);
+  const mergeExtras = (partial) =>
+    updateOrcamentoExtras(currentOrcId, { ...(currentOrc?.extras || {}), ...partial });
 
   const saveMob = (newMob) => {
     const parsed = {
@@ -75,7 +76,7 @@ export default function Orcamentos() {
       distanciaKm: parseFloat(newMob.distanciaKm) || 0,
     };
     setMob(parsed);
-    updateExtras({ ...extras, mobilizacao: parsed });
+    mergeExtras({ mobilizacao: parsed });
   };
 
   const handleAddMO = () => {
@@ -84,46 +85,54 @@ export default function Orcamentos() {
     if (!func) return;
     if (maoDeObra.find(m => m.funcionarioId === moFuncId)) { alert('Funcionário já adicionado.'); return; }
     const newList = [...maoDeObra, { funcionarioId: moFuncId, nome: func.nome, funcao: func.funcao, diasPrevistos: parseFloat(moDias) || 1, custoDiaria: func.custoDiaria }];
-    updateExtras({ ...extras, maoDeObra: newList });
+    mergeExtras({ maoDeObra: newList });
     setAddingMO(false); setMoFuncId(''); setMoDias(1);
   };
 
-  const handleRemoveMO = (fId) => updateExtras({ ...extras, maoDeObra: maoDeObra.filter(m => m.funcionarioId !== fId) });
+  const handleRemoveMO = (fId) => mergeExtras({ maoDeObra: maoDeObra.filter(m => m.funcionarioId !== fId) });
 
   const handleMODiasBlur = (fId, val) => {
     const newList = maoDeObra.map(m => m.funcionarioId === fId ? { ...m, diasPrevistos: parseFloat(val) || 0 } : m);
-    updateExtras({ ...extras, maoDeObra: newList });
+    mergeExtras({ maoDeObra: newList });
+  };
+
+  // Pure geocoding + haversine — returns km or throws
+  const geocodeDistancia = async (destino) => {
+    if (!empresa?.endereco) throw new Error('Configure o endereço da empresa no Perfil primeiro.');
+    if (!destino) throw new Error('Informe o endereço de destino.');
+    const [r1, r2] = await Promise.all([
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(empresa.endereco)}&format=json&limit=1`).then(r => r.json()),
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destino)}&format=json&limit=1`).then(r => r.json()),
+    ]);
+    if (!r1.length) throw new Error('Endereço da empresa não encontrado no mapa. Verifique o endereço no Perfil.');
+    if (!r2.length) throw new Error('Endereço de destino não encontrado no mapa. Tente um endereço mais completo.');
+    const toRad = (v) => v * Math.PI / 180;
+    const lat1 = parseFloat(r1[0].lat), lon1 = parseFloat(r1[0].lon);
+    const lat2 = parseFloat(r2[0].lat), lon2 = parseFloat(r2[0].lon);
+    const R = 6371;
+    const a = Math.sin(toRad(lat2 - lat1) / 2) ** 2
+      + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(toRad(lon2 - lon1) / 2) ** 2;
+    // 1.2 road factor: real roads are ~20% longer than straight-line
+    return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1.2 * 10) / 10;
   };
 
   const calcularDistancia = async (destinoOverride) => {
-    const destino = destinoOverride || mob.enderecoDestino;
+    // Always use the override if provided, otherwise read latest from state
+    const destino = destinoOverride ?? mob.enderecoDestino;
     setCalcLoading(true);
     try {
-      if (!empresa?.endereco) throw new Error('Configure o endereço da empresa no Perfil primeiro.');
-      if (!destino) throw new Error('Informe o endereço de destino.');
-      const [r1, r2] = await Promise.all([
-        fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(empresa.endereco)}&format=json&limit=1`).then(r => r.json()),
-        fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destino)}&format=json&limit=1`).then(r => r.json()),
-      ]);
-      if (!r1.length) throw new Error('Endereço da empresa não encontrado.');
-      if (!r2.length) throw new Error('Endereço de destino não encontrado.');
-      const [lat1, lon1] = [parseFloat(r1[0].lat), parseFloat(r1[0].lon)];
-      const [lat2, lon2] = [parseFloat(r2[0].lat), parseFloat(r2[0].lon)];
-      const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-      const distKm = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1.3 * 10) / 10;
+      const distKm = await geocodeDistancia(destino);
       const newMob = { ...mob, enderecoDestino: destino, distanciaKm: distKm };
       setMob(newMob);
-      updateExtras({ ...extras, mobilizacao: newMob });
+      // Merge with latest extras so we don't overwrite other sections
+      updateOrcamentoExtras(currentOrcId, { ...(currentOrc?.extras || {}), mobilizacao: newMob });
     } catch (e) { alert(e.message); }
     finally { setCalcLoading(false); }
   };
 
   const saveCli = (newCli) => {
     setCli(newCli);
-    updateExtras({ ...extras, cliente: newCli });
+    mergeExtras({ cliente: newCli });
   };
 
   const handleCnpjSearchOrc = async (cnpj) => {
@@ -135,10 +144,21 @@ export default function Orcamentos() {
       if (!response.ok) throw new Error('CNPJ não encontrado');
       const data = await response.json();
       const endereco = `${data.logradouro}, ${data.numero}${data.complemento ? ' - ' + data.complemento : ''} - ${data.bairro} - ${data.municipio}/${data.uf}`;
-      const novo = { ...cli, cnpj, nome: data.razao_social, endereco };
-      saveCli(novo);
-      // auto-fill mobilização destination and calculate distance
-      await calcularDistancia(endereco);
+      const novoCli = { ...cli, cnpj, nome: data.razao_social, endereco };
+      setCli(novoCli);
+      // Calculate distance with the new address
+      setCalcLoading(true);
+      let distKm = null;
+      try { distKm = await geocodeDistancia(endereco); } catch { /* silent — user can retry manually */ }
+      setCalcLoading(false);
+      const newMob = { ...mob, enderecoDestino: endereco, ...(distKm !== null ? { distanciaKm: distKm } : {}) };
+      setMob(newMob);
+      // Save client + mobilizacao in a single write to avoid overwrites
+      updateOrcamentoExtras(currentOrcId, {
+        ...(currentOrc?.extras || {}),
+        cliente: novoCli,
+        mobilizacao: newMob,
+      });
     } catch (err) {
       alert('Erro ao buscar: ' + err.message);
     } finally {
@@ -324,7 +344,7 @@ export default function Orcamentos() {
                   <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Veículo</label>
                   <input type="text" placeholder="Ex: Hilux, Van..." value={mob.veiculo || ''}
                     onChange={e => setMob(p => ({ ...p, veiculo: e.target.value }))}
-                    onBlur={() => updateExtras({ ...extras, mobilizacao: mob })}
+                    onBlur={e => mergeExtras({ mobilizacao: { ...mob, veiculo: e.target.value } })}
                     style={inputSt} />
                 </div>
                 <div>
@@ -360,9 +380,13 @@ export default function Orcamentos() {
                   <div style={{ display: 'flex', gap: 8 }}>
                     <input type="text" placeholder="Rua, Cidade, Estado..." value={mob.enderecoDestino || ''}
                       onChange={e => setMob(p => ({ ...p, enderecoDestino: e.target.value }))}
-                      onBlur={() => updateExtras({ ...extras, mobilizacao: mob })}
+                      onBlur={e => {
+                        const newMob = { ...mob, enderecoDestino: e.target.value };
+                        setMob(newMob);
+                        updateOrcamentoExtras(currentOrcId, { ...(currentOrc?.extras || {}), mobilizacao: newMob });
+                      }}
                       style={{ ...inputSt, flex: 1 }} />
-                    <button className="btn btn-primary btn-sm" onClick={calcularDistancia} disabled={calcLoading} style={{ whiteSpace: 'nowrap' }}>
+                    <button className="btn btn-primary btn-sm" onClick={() => calcularDistancia(mob.enderecoDestino)} disabled={calcLoading} style={{ whiteSpace: 'nowrap' }}>
                       <RefreshCw size={13} /> {calcLoading ? '...' : 'Calcular'}
                     </button>
                   </div>
