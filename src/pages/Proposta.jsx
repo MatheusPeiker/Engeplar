@@ -5,7 +5,7 @@ import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
 export default function Proposta() {
-  const { propostas, listaOrcamentos, addObra, updateOrcamento, updateProposta, addProposta, deleteProposta, getTotalOrcamento, formatCurrency, salvarVersao } = useAppContext();
+  const { propostas, listaOrcamentos, addObra, updateOrcamento, updateOrcamentoExtras, updateProposta, addProposta, deleteProposta, getTotalOrcamento, formatCurrency, salvarVersao } = useAppContext();
   
   const [view, setView] = useState('list'); // 'list' ou 'detail'
   const [currentPId, setCurrentPId] = useState(null);
@@ -57,6 +57,19 @@ export default function Proposta() {
     updateProposta(currentPId, campo, valor);
   };
 
+  const preencherMobDestino = (orcId, endereco) => {
+    if (!orcId || !endereco) return;
+    const orc = listaOrcamentos.find(o => o.id === orcId);
+    if (!orc) return;
+    const novosExtras = { ...orc.extras, mobilizacao: { ...(orc.extras?.mobilizacao || {}), enderecoDestino: endereco } };
+    updateOrcamentoExtras(orcId, novosExtras);
+  };
+
+  const handleVincularOrcamento = (orcId) => {
+    handleUpdate('orcamentoId', orcId || null);
+    if (orcId) preencherMobDestino(orcId, proposta?.clienteEndereco);
+  };
+
   const handleCnpjSearch = async (cnpj) => {
     const cleanCnpj = cnpj.replace(/\D/g, '');
     if (cleanCnpj.length !== 14) return;
@@ -68,6 +81,7 @@ export default function Proposta() {
       const endereco = `${data.logradouro}, ${data.numero} ${data.complemento ? '- ' + data.complemento : ''} - ${data.bairro} - ${data.municipio}/${data.uf}`;
       handleUpdate('clienteNome', data.razao_social);
       handleUpdate('clienteEndereco', endereco);
+      if (proposta?.orcamentoId) preencherMobDestino(proposta.orcamentoId, endereco);
     } catch (err) {
       alert('Erro ao buscar: ' + err.message);
     } finally {
@@ -167,7 +181,7 @@ export default function Proposta() {
 
                 <div style={{ gridColumn: 'span 2' }}>
                   <label className="text-secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Orçamento de Referência</label>
-                  <select value={proposta.orcamentoId || ''} onChange={e => handleUpdate('orcamentoId', e.target.value || null)} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <select value={proposta.orcamentoId || ''} onChange={e => handleVincularOrcamento(e.target.value)} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
                     <option value="">Selecione um orçamento...</option>
                     {listaOrcamentos.map(o => <option key={o.id} value={o.id}>{o.nome} ({formatCurrency(getTotalOrcamento(o.id))})</option>)}
                   </select>
