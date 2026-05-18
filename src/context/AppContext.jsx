@@ -84,7 +84,7 @@ export const AppProvider = ({ children }) => {
   const [compras, setCompras] = useState([]);
   const [historico, setHistorico] = useState([]);
   const [versoes, setVersoes] = useState([]);
-  const [notificacoes] = useState([
+  const [notificacoes, setNotificacoes] = useState([
     { id: 1, titulo: 'Bem-vindo', descricao: 'Seus dados estão sendo carregados do banco.', lida: false },
   ]);
 
@@ -647,7 +647,6 @@ export const AppProvider = ({ children }) => {
   };
 
   // ── Notificações ──────────────────────────────────────────
-  const [_notif, setNotificacoes] = useState(notificacoes);
   const marcarComoLida = (id) => setNotificacoes(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n));
   const getNotificacoesNaoLidas = () => notificacoes.filter(n => !n.lida).length;
 
