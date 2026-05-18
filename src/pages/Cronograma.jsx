@@ -37,7 +37,7 @@ export default function Cronograma() {
           <p className="page-subtitle">Edite datas, custos e progresso de cada etapa</p>
         </div>
         <div className="flex gap-2">
-          <select value={obraSelecionada} onChange={e => setObraSelecionada(parseInt(e.target.value))} style={{ padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 14 }}>
+          <select value={obraSelecionada} onChange={e => setObraSelecionada(e.target.value)} style={{ padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 14 }}>
             {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
           </select>
           <button className="btn btn-primary btn-sm" onClick={handleAddEtapa}><Plus size={14} /> Nova Etapa</button>
