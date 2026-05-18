@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { FileText, Download, Save, TrendingUp, TrendingDown, DollarSign, Plus, Search, Loader2, ArrowLeft, Trash2, ChevronRight } from 'lucide-react';
+import { FileText, Download, Save, Plus, Search, ArrowLeft, Trash2, ChevronRight, Building2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
 export default function Proposta() {
-  const { obras, propostas, listaOrcamentos, updateProposta, addProposta, deleteProposta, getTotalOrcamento, formatCurrency, salvarVersao } = useAppContext();
+  const { propostas, listaOrcamentos, addObra, updateProposta, addProposta, deleteProposta, getTotalOrcamento, formatCurrency, salvarVersao } = useAppContext();
   
   const [view, setView] = useState('list'); // 'list' ou 'detail'
   const [currentPId, setCurrentPId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newPName, setNewPName] = useState('');
   const [isLoadingCnpj, setIsLoadingCnpj] = useState(false);
+  const [obraGerada, setObraGerada] = useState(null);
 
   const proposta = propostas.find(p => p.id === currentPId);
   const custoReal = proposta?.orcamentoId ? getTotalOrcamento(proposta.orcamentoId) : 0;
@@ -24,13 +25,28 @@ export default function Proposta() {
   const lucroEstimado = valorProposto - custoReal;
   const dPerc = custoReal > 0 ? ((valorProposto - custoReal) / custoReal * 100).toFixed(1) : 0;
 
-  const handleCreateProposta = (e) => {
+  const handleCreateProposta = async (e) => {
     e.preventDefault();
-    const id = addProposta(newPName);
+    const id = await addProposta(newPName);
     setIsModalOpen(false);
     setNewPName('');
-    setCurrentPId(id);
-    setView('detail');
+    if (id) { setCurrentPId(id); setView('detail'); }
+  };
+
+  const handleGerarObra = async () => {
+    if (!proposta) return;
+    if (!confirm(`Criar obra "${proposta.nome}" a partir desta proposta?`)) return;
+    const obraId = await addObra({
+      nome: proposta.nome,
+      endereco: proposta.clienteEndereco || '',
+      status: 'Em andamento',
+      previsao: '',
+      orcamento: valorProposto,
+    });
+    if (obraId) {
+      setObraGerada(proposta.nome);
+      updateProposta(currentPId, 'obraId', obraId);
+    }
   };
 
   const handleUpdate = (campo, valor) => {
@@ -73,11 +89,11 @@ export default function Proposta() {
       {view === 'list' && (
         <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
           {propostas.map(p => {
-            const obra = p.obraId ? obras.find(o => o.id === p.obraId) : null;
             const custo = p.orcamentoId ? getTotalOrcamento(p.orcamentoId) : 0;
             const vProposto = p.valorProposto || (custo * (1 + p.margemLucro/100) * (1 + p.impostos/100));
+            const orc = p.orcamentoId ? listaOrcamentos.find(o => o.id === p.orcamentoId) : null;
             return (
-              <div key={p.id} className="card hover-effect" style={{ cursor: 'pointer' }} onClick={() => { setCurrentPId(p.id); setView('detail'); }}>
+              <div key={p.id} className="card hover-effect" style={{ cursor: 'pointer' }} onClick={() => { setCurrentPId(p.id); setObraGerada(null); setView('detail'); }}>
                 <div className="flex justify-between items-start mb-4">
                   <div className="logo-icon" style={{ background: 'var(--success-light)', color: 'var(--success)', width: 40, height: 40, borderRadius: 8 }}>
                     <FileText size={20} />
@@ -87,10 +103,9 @@ export default function Proposta() {
                   </button>
                 </div>
                 <h3 style={{ fontWeight: 700, fontSize: 17, marginBottom: 4 }}>{p.nome}</h3>
-                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>{p.clienteNome || 'Cliente não definido'}</p>
-                
-                {obra && <p style={{ fontSize: 11, color: 'var(--primary)', marginBottom: 12, fontWeight: 600 }}>Obra: {obra.nome}</p>}
-                
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>{p.clienteNome || 'Cliente não definido'}</p>
+                {orc && <p style={{ fontSize: 11, color: 'var(--primary)', marginBottom: 12, fontWeight: 600 }}>Orçamento: {orc.nome}</p>}
+                {p.obraId && <p style={{ fontSize: 11, color: 'var(--success)', marginBottom: 8, fontWeight: 600 }}>Obra gerada</p>}
                 <div className="flex justify-between items-end" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                   <div>
                     <p style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Valor Proposto</p>
@@ -134,12 +149,17 @@ export default function Proposta() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                {/* Botão Gerar Obra */}
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label className="text-secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Vincular a Obra (Opcional)</label>
-                  <select value={proposta.obraId || ''} onChange={e => handleUpdate('obraId', e.target.value ? parseInt(e.target.value) : null)} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <option value="">Sem obra vinculada</option>
-                    {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
-                  </select>
+                  {proposta.obraId || obraGerada ? (
+                    <div style={{ padding: '10px 14px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, fontSize: 13, color: 'var(--success)', fontWeight: 600 }}>
+                      Obra "{obraGerada || proposta.nome}" criada com sucesso.
+                    </div>
+                  ) : (
+                    <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleGerarObra}>
+                      <Building2 size={16} /> Gerar Obra a partir desta Proposta
+                    </button>
+                  )}
                 </div>
 
                 <div style={{ gridColumn: 'span 2' }}>

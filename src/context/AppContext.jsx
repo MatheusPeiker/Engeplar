@@ -26,6 +26,7 @@ const norm = {
   }),
   orcamento: (r) => ({
     id: r.id, nome: r.nome, obraId: r.obra_id,
+    extras: r.extras || {},
     itens: (r.orcamento_itens ?? []).map(i => ({
       id: i.id, descricao: i.descricao, categoria: i.categoria,
       unidade: i.unidade, quantidade: i.quantidade ?? 1, custoUnitario: i.custo_unitario ?? 0
@@ -276,9 +277,10 @@ export const AppProvider = ({ children }) => {
       previsao: novaObra.previsao, orcamento: novaObra.orcamento || 0,
       lat, lng, user_id: uid()
     }).select('*, gastos_despesas(*)').single();
-    if (error) { setObras(prev => prev.filter(o => o.id !== tempId)); return; }
+    if (error) { setObras(prev => prev.filter(o => o.id !== tempId)); return null; }
     setObras(prev => prev.map(o => o.id === tempId ? norm.obra(data) : o));
     registrarAlteracao('Obras', 'Nova obra criada', null, novaObra.nome);
+    return data.id;
   };
 
   const updateObra = useCallback(async (obraId, campo, valor) => {
@@ -392,6 +394,11 @@ export const AppProvider = ({ children }) => {
   const deleteOrcamentoItem = async (orcId, itemId) => {
     setListaOrcamentos(prev => prev.map(o => o.id === orcId ? { ...o, itens: o.itens.filter(i => i.id !== itemId) } : o));
     await supabase.from('orcamento_itens').delete().eq('id', itemId);
+  };
+
+  const updateOrcamentoExtras = async (orcId, extras) => {
+    setListaOrcamentos(prev => prev.map(o => o.id === orcId ? { ...o, extras } : o));
+    await supabase.from('orcamentos').update({ extras }).eq('id', orcId);
   };
 
   const getOrcamentoObra = (obraId) => {
@@ -664,7 +671,7 @@ export const AppProvider = ({ children }) => {
       clientes, addCliente, updateCliente, deleteCliente,
       fornecedores, addFornecedor, updateFornecedor, deleteFornecedor,
       obras, addObra, updateObra, deleteObra, addGastoDaObra, updateGasto, deleteGasto, calcProgressoFinanceiro,
-      listaOrcamentos, addOrcamento, updateOrcamento, deleteOrcamento, addOrcamentoItem, updateOrcamentoItem, deleteOrcamentoItem, getOrcamentoObra, getTotalOrcamento,
+      listaOrcamentos, addOrcamento, updateOrcamento, deleteOrcamento, addOrcamentoItem, updateOrcamentoItem, deleteOrcamentoItem, updateOrcamentoExtras, getOrcamentoObra, getTotalOrcamento,
       propostas, getPropostaObra, updateProposta, addProposta, deleteProposta,
       cronogramas, getCronogramaObra, addEtapaCronograma, updateEtapaCronograma, deleteEtapaCronograma,
       arquivos, getArquivosObra, addArquivo, deleteArquivo,
