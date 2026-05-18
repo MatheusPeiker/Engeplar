@@ -5,7 +5,7 @@ import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
 export default function Proposta() {
-  const { propostas, listaOrcamentos, addObra, updateProposta, addProposta, deleteProposta, getTotalOrcamento, formatCurrency, salvarVersao } = useAppContext();
+  const { propostas, listaOrcamentos, addObra, updateOrcamento, updateProposta, addProposta, deleteProposta, getTotalOrcamento, formatCurrency, salvarVersao } = useAppContext();
   
   const [view, setView] = useState('list'); // 'list' ou 'detail'
   const [currentPId, setCurrentPId] = useState(null);
@@ -46,6 +46,9 @@ export default function Proposta() {
     if (obraId) {
       setObraGerada(proposta.nome);
       updateProposta(currentPId, 'obraId', obraId);
+      if (proposta.orcamentoId) {
+        updateOrcamento(proposta.orcamentoId, 'obraId', obraId);
+      }
     }
   };
 

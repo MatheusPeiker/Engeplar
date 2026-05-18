@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { ArrowLeft, Plus, Trash2, MapPin, Calendar, FileText, DollarSign, Users, UserPlus, UserMinus } from 'lucide-react';
@@ -12,7 +12,7 @@ export default function ObraDetalhes() {
     obras, updateObra,
     addGastoDaObra, updateGasto, deleteGasto,
     calcProgressoFinanceiro,
-    getOrcamentoObra, getTotalOrcamento,
+    listaOrcamentos,
     getCronogramaObra, addEtapaCronograma, updateEtapaCronograma, deleteEtapaCronograma,
     getArquivosObra, addArquivo, deleteArquivo,
     getPropostaObra,
@@ -31,8 +31,19 @@ export default function ObraDetalhes() {
 
   const { gasto, progressoPerc, alerta } = calcProgressoFinanceiro(obra);
   const orcamentoRestante = obra.orcamento - gasto;
-  const orcItens = getOrcamentoObra(id);
-  const totalOrc = orcItens.reduce((acc, i) => acc + (i.quantidade * i.custoUnitario), 0);
+
+  const orcamento = listaOrcamentos.find(o => o.obraId === id);
+  const orcItens = orcamento?.itens || [];
+  const orcMO = orcamento?.extras?.maoDeObra || [];
+  const orcMob = orcamento?.extras?.mobilizacao || {};
+  const nViagens = parseInt(orcMob.numViagens) || 1;
+  const totalItens = orcItens.reduce((a, i) => a + i.quantidade * i.custoUnitario, 0);
+  const totalMO = orcMO.reduce((a, m) => a + (m.custoDiaria || 0) * (m.diasPrevistos || 0), 0);
+  const totalMob = orcMob.distanciaKm
+    ? (parseFloat(orcMob.distanciaKm) * (parseFloat(orcMob.custoPorKm) || 0) * nViagens)
+      + ((parseInt(orcMob.numPessoas) || 0) * (parseFloat(orcMob.custoAdicionalPorPessoa) || 0) * nViagens)
+    : 0;
+  const totalOrc = totalItens + totalMO + totalMob;
   const cronograma = getCronogramaObra(id);
   const arquivos = getArquivosObra(id);
   const propostasDaObra = getPropostaObra(id);
@@ -243,50 +254,126 @@ export default function ObraDetalhes() {
 
       {/* === ORÇAMENTO === */}
       {aba === 'orcamento' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div className="flex justify-between items-center" style={{ padding: 16, borderBottom: '1px solid var(--border)' }}>
-            <div>
-              <h3 style={{ fontWeight: 600 }}>Itens do Orçamento</h3>
-              <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
-                Para edição completa, acesse{' '}
-                <span style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }} onClick={() => navigate('/orcamentos')}>
-                  Orçamentos
-                </span>
+        <div>
+          {!orcamento ? (
+            <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <DollarSign size={32} style={{ marginBottom: 8, opacity: .4 }} />
+              <p>Nenhum orçamento vinculado a esta obra.</p>
+              <p style={{ fontSize: 12, marginTop: 4 }}>Crie um orçamento em{' '}
+                <span style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }} onClick={() => navigate('/orcamentos')}>Orçamentos</span>
+                {' '}e vincule-o aqui.
               </p>
             </div>
-            <button className="btn btn-primary btn-sm" onClick={() => navigate('/orcamentos')}>
-              <Plus size={14} /> Gerenciar Orçamentos
-            </button>
-          </div>
-          {orcItens.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
-              <DollarSign size={32} style={{ marginBottom: 8, opacity: .4 }} />
-              <p>Nenhum item de orçamento vinculado a esta obra.</p>
-              <p style={{ fontSize: 12, marginTop: 4 }}>Crie um orçamento em <span style={{ color: 'var(--primary)', cursor: 'pointer' }} onClick={() => navigate('/orcamentos')}>Orçamentos</span> e vincule-o a esta obra.</p>
-            </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="table-editable">
-                <thead>
-                  <tr><th>Item</th><th style={{ textAlign: 'center' }}>Unid.</th><th style={{ textAlign: 'right' }}>Qtd.</th><th style={{ textAlign: 'right' }}>Unitário</th><th style={{ textAlign: 'right' }}>Total</th></tr>
-                </thead>
-                <tbody>
-                  {orcItens.map(item => (
-                    <tr key={item.id}>
-                      <td>{item.descricao}</td>
-                      <td style={{ textAlign: 'center' }}>{item.unidade}</td>
-                      <td style={{ textAlign: 'right' }}>{item.quantidade}</td>
-                      <td style={{ textAlign: 'right' }}>{formatCurrency(item.custoUnitario)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.quantidade * item.custoUnitario)}</td>
-                    </tr>
-                  ))}
-                  <tr style={{ background: 'var(--background)', fontWeight: 700 }}>
-                    <td colSpan="4" style={{ textAlign: 'right' }}>Total do Orçamento</td>
-                    <td style={{ textAlign: 'right', color: 'var(--primary)' }}>{formatCurrency(totalOrc)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Header */}
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 style={{ fontWeight: 700, fontSize: 16 }}>{orcamento.nome}</h3>
+                  <p className="text-muted" style={{ fontSize: 12 }}>
+                    Para editar, acesse{' '}
+                    <span style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }} onClick={() => navigate('/orcamentos')}>Orçamentos</span>
+                  </p>
+                </div>
+                <div className="card" style={{ padding: '8px 20px', background: 'var(--primary)', color: 'white', border: 'none' }}>
+                  <p style={{ fontSize: 11, opacity: .8 }}>Total Geral</p>
+                  <p style={{ fontSize: 22, fontWeight: 800 }}>{formatCurrency(totalOrc)}</p>
+                </div>
+              </div>
+
+              {/* Itens */}
+              <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+                <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13 }}>
+                  Materiais e Serviços
+                </div>
+                {orcItens.length === 0 ? (
+                  <p style={{ padding: 16, color: 'var(--text-muted)', fontSize: 13 }}>Nenhum item.</p>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="table-editable">
+                      <thead>
+                        <tr>
+                          <th>Descrição</th>
+                          <th style={{ textAlign: 'center' }}>Unid.</th>
+                          <th style={{ textAlign: 'right' }}>Qtd.</th>
+                          <th style={{ textAlign: 'right' }}>Unitário</th>
+                          <th style={{ textAlign: 'right' }}>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orcItens.map(item => (
+                          <tr key={item.id}>
+                            <td>{item.descricao}</td>
+                            <td style={{ textAlign: 'center' }}>{item.unidade}</td>
+                            <td style={{ textAlign: 'right' }}>{item.quantidade}</td>
+                            <td style={{ textAlign: 'right' }}>{formatCurrency(item.custoUnitario)}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.quantidade * item.custoUnitario)}</td>
+                          </tr>
+                        ))}
+                        <tr style={{ background: 'var(--background)', fontWeight: 700 }}>
+                          <td colSpan="4" style={{ textAlign: 'right', fontSize: 12 }}>Subtotal</td>
+                          <td style={{ textAlign: 'right', color: 'var(--primary)' }}>{formatCurrency(totalItens)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Mão de Obra */}
+              {orcMO.length > 0 && (
+                <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+                  <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13, color: '#06b6d4' }}>
+                    Mão de Obra
+                  </div>
+                  <table className="table-editable">
+                    <thead>
+                      <tr>
+                        <th>Profissional</th>
+                        <th>Função</th>
+                        <th style={{ textAlign: 'center' }}>Dias Previstos</th>
+                        <th style={{ textAlign: 'right' }}>Custo/Dia</th>
+                        <th style={{ textAlign: 'right' }}>Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orcMO.map(m => (
+                        <tr key={m.funcionarioId}>
+                          <td style={{ fontWeight: 500 }}>{m.nome}</td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{m.funcao}</td>
+                          <td style={{ textAlign: 'center' }}>{m.diasPrevistos}</td>
+                          <td style={{ textAlign: 'right' }}>{formatCurrency(m.custoDiaria)}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 600, color: '#06b6d4' }}>{formatCurrency(m.custoDiaria * m.diasPrevistos)}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: 'var(--background)', fontWeight: 700 }}>
+                        <td colSpan="4" style={{ textAlign: 'right', fontSize: 12 }}>Subtotal</td>
+                        <td style={{ textAlign: 'right', color: '#06b6d4' }}>{formatCurrency(totalMO)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Mobilização */}
+              {totalMob > 0 && (
+                <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+                  <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13, color: '#f59e0b' }}>
+                    Mobilização
+                  </div>
+                  <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, fontSize: 13 }}>
+                    {orcMob.veiculo && <div><span style={{ color: 'var(--text-muted)' }}>Veículo: </span><strong>{orcMob.veiculo}</strong></div>}
+                    {orcMob.distanciaKm && <div><span style={{ color: 'var(--text-muted)' }}>Distância: </span><strong>{orcMob.distanciaKm} km</strong></div>}
+                    {orcMob.custoPorKm && <div><span style={{ color: 'var(--text-muted)' }}>Custo/km: </span><strong>{formatCurrency(orcMob.custoPorKm)}</strong></div>}
+                    {orcMob.numViagens && <div><span style={{ color: 'var(--text-muted)' }}>Viagens: </span><strong>{orcMob.numViagens}</strong></div>}
+                    {orcMob.numPessoas > 0 && <div><span style={{ color: 'var(--text-muted)' }}>Pessoas: </span><strong>{orcMob.numPessoas}</strong></div>}
+                  </div>
+                  <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', fontWeight: 700, color: '#f59e0b' }}>
+                    Total Mobilização: {formatCurrency(totalMob)}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
