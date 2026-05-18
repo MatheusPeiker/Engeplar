@@ -164,9 +164,9 @@ export default function Proposta() {
 
                 <div style={{ gridColumn: 'span 2' }}>
                   <label className="text-secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Orçamento de Referência</label>
-                  <select value={proposta.orcamentoId || ''} onChange={e => handleUpdate('orcamentoId', e.target.value ? parseInt(e.target.value) : null)} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <select value={proposta.orcamentoId || ''} onChange={e => handleUpdate('orcamentoId', e.target.value || null)} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
                     <option value="">Selecione um orçamento...</option>
-                    {listaOrcamentos.map(o => <option key={o.id} value={o.id}>{o.nome} ({formatCurrency(o.itens.reduce((a,b) => a + b.quantidade*b.custoUnitario, 0))})</option>)}
+                    {listaOrcamentos.map(o => <option key={o.id} value={o.id}>{o.nome} ({formatCurrency(getTotalOrcamento(o.id))})</option>)}
                   </select>
                 </div>
 

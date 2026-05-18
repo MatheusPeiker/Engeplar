@@ -409,7 +409,15 @@ export const AppProvider = ({ children }) => {
   const getTotalOrcamento = (orcId) => {
     const orc = listaOrcamentos.find(o => o.id === orcId);
     if (!orc) return 0;
-    return orc.itens.reduce((a, i) => a + (i.quantidade * i.custoUnitario), 0);
+    const totalItens = orc.itens.reduce((a, i) => a + (i.quantidade * i.custoUnitario), 0);
+    const totalMO = (orc.extras?.maoDeObra || []).reduce((a, m) => a + (m.custoDiaria || 0) * (m.diasPrevistos || 0), 0);
+    const mob = orc.extras?.mobilizacao || {};
+    const nViagens = parseInt(mob.numViagens) || 1;
+    const totalMob = mob.distanciaKm
+      ? (parseFloat(mob.distanciaKm) * (parseFloat(mob.custoPorKm) || 0) * nViagens)
+        + ((parseInt(mob.numPessoas) || 0) * (parseFloat(mob.custoAdicionalPorPessoa) || 0) * nViagens)
+      : 0;
+    return totalItens + totalMO + totalMob;
   };
 
   // ── Propostas ─────────────────────────────────────────────
