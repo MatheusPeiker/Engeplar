@@ -131,16 +131,22 @@ export default function ObraDetalhes() {
             <InlineEdit value={obra.endereco} onSave={v => updateObra(id, 'endereco', v)} />
           </p>
         </div>
-        <InlineEdit value={obra.status} type="select" options={['Em andamento', 'Atrasada', 'Concluída', 'Pausada']} onSave={v => updateObra(id, 'status', v)} />
-        {obra.status !== 'Concluída' && (
-          <button className="btn btn-primary" onClick={abrirFinalizar} style={{ background: 'var(--success)', borderColor: 'var(--success)', whiteSpace: 'nowrap' }}>
-            <CheckCircle size={16} /> Finalizar Obra
-          </button>
-        )}
-        {obra.status === 'Concluída' && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: 'var(--success)', padding: '6px 14px', background: 'rgba(16,185,129,0.1)', borderRadius: 8, border: '1px solid rgba(16,185,129,0.3)' }}>
-            <CheckCircle size={15} /> Concluída
-          </span>
+        {obra.status === 'Concluída' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: 'var(--success)', padding: '6px 14px', background: 'rgba(16,185,129,0.1)', borderRadius: 8, border: '1px solid rgba(16,185,129,0.3)' }}>
+              <CheckCircle size={15} /> Concluída
+            </span>
+            <button className="btn btn-secondary btn-sm" onClick={() => updateObra(id, 'status', 'Em andamento')} title="Reabrir obra">
+              Reabrir
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <InlineEdit value={obra.status} type="select" options={['Em andamento', 'Atrasada', 'Pausada']} onSave={v => updateObra(id, 'status', v)} />
+            <button className="btn btn-primary" onClick={abrirFinalizar} style={{ background: 'var(--success)', borderColor: 'var(--success)', whiteSpace: 'nowrap' }}>
+              <CheckCircle size={16} /> Finalizar Obra
+            </button>
+          </div>
         )}
       </div>
 
