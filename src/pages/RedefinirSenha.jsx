@@ -15,27 +15,43 @@ export default function RedefinirSenha() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Supabase emits PASSWORD_RECOVERY when the user arrives via the reset link
+    // Supabase v2 processa o hash da URL automaticamente e dispara PASSWORD_RECOVERY
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setPhase('form');
-      } else if (event === 'SIGNED_IN' && phase === 'waiting') {
-        // Already signed in but not a recovery event — redirect to app
-        navigate('/');
       }
     });
 
-    // If the URL contains the recovery token (hash fragment), Supabase processes it
-    // automatically on the next tick; give it a moment then show invalid if nothing came
-    const timeout = setTimeout(() => {
-      setPhase((p) => (p === 'waiting' ? 'invalid' : p));
-    }, 4000);
+    // Fallback: após 3s, verifica se já há sessão ativa (caso o evento tenha disparado antes do listener)
+    const timeout = setTimeout(async () => {
+      setPhase(current => {
+        if (current !== 'waiting') return current;
+        return 'checking'; // aciona verificação assíncrona abaixo
+      });
+    }, 3000);
 
     return () => {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Quando phase vira 'checking', verifica sessão existente
+  useEffect(() => {
+    if (phase !== 'checking') return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      // Se há sessão e a URL ainda contém indicação de recovery
+      const hash = window.location.hash;
+      if (session && (hash.includes('type=recovery') || hash.includes('access_token'))) {
+        setPhase('form');
+      } else if (session) {
+        // Já autenticado normalmente — vai para o app
+        navigate('/');
+      } else {
+        setPhase('invalid');
+      }
+    });
+  }, [phase, navigate]);
 
   const validatePassword = (pwd) => {
     if (pwd.length < 8) return 'Mínimo 8 caracteres';
@@ -53,14 +69,26 @@ export default function RedefinirSenha() {
     if (password !== confirm) { setError('As senhas não coincidem.'); return; }
 
     setLoading(true);
+
+    // Garante que ainda há sessão válida antes de tentar atualizar
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setLoading(false);
+      setPhase('invalid');
+      return;
+    }
+
     const { error: err } = await supabase.auth.updateUser({ password });
     setLoading(false);
 
     if (err) {
-      setError(err.message || 'Erro ao redefinir senha. Tente novamente.');
+      // Erro genérico — instrui o usuário a solicitar novo link
+      setError('Sessão expirada ou inválida. Solicite um novo link de recuperação no login.');
     } else {
       setPhase('done');
-      setTimeout(() => navigate('/'), 3000);
+      // Faz logout para forçar novo login com a senha nova
+      await supabase.auth.signOut();
+      setTimeout(() => navigate('/login'), 3000);
     }
   };
 
@@ -83,8 +111,8 @@ export default function RedefinirSenha() {
           </p>
         </div>
 
-        {/* Aguardando token */}
-        {phase === 'waiting' && (
+        {/* Aguardando / verificando */}
+        {(phase === 'waiting' || phase === 'checking') && (
           <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
             Verificando link...
           </p>
@@ -93,12 +121,15 @@ export default function RedefinirSenha() {
         {/* Link inválido ou expirado */}
         {phase === 'invalid' && (
           <div style={{ textAlign: 'center' }}>
-            <p style={{ color: 'var(--danger)', fontSize: 14, marginBottom: 20, lineHeight: 1.6 }}>
-              Link inválido ou expirado. Solicite um novo link de recuperação.
+            <p style={{ color: 'var(--danger)', fontSize: 14, marginBottom: 8, lineHeight: 1.6 }}>
+              Link inválido ou expirado.
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24, lineHeight: 1.5 }}>
+              Solicite um novo link clicando em <strong>"Esqueceu a senha?"</strong> na tela de login.
             </p>
             <button onClick={() => navigate('/login')}
               className="btn btn-primary" style={{ width: '100%', padding: 12 }}>
-              Voltar ao login
+              Ir para o login
             </button>
           </div>
         )}
@@ -176,7 +207,7 @@ export default function RedefinirSenha() {
               Senha redefinida com sucesso!
             </p>
             <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              Redirecionando para o sistema...
+              Redirecionando para o login...
             </p>
           </div>
         )}
