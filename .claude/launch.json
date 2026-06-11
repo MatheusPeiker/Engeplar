@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "assistencia-pro",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "C:\\Users\\USUARIO\\Desktop\\assistencia-pro"],
+      "port": 5173
+    },
+    {
+      "name": "marketing-os",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "C:\\Users\\USUARIO\\Desktop\\Marketing app\\marketing-os\\start.cmd"],
+      "port": 3000
+    }
+  ,{
+      "name": "gilli-advocacia",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "C:\\Users\\USUARIO\\Desktop\\Gilli\\gilli-advocacia"],
+      "port": 3001,
+      "autoPort": false
+    }
+  ]
+}

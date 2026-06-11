@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, HardHat, FileText, Wallet, ShoppingCart, BarChart3, Users, Menu, Bell, Search, Settings, LogOut, Check, Calendar, FolderOpen, History, ClipboardList, Contact2 } from 'lucide-react';
+import { LayoutDashboard, HardHat, FileText, Wallet, ShoppingCart, BarChart3, Users, Menu, Bell, Search, Settings, LogOut, Check, Calendar, FolderOpen, History, ClipboardList, Contact2, BookMarked, Microscope } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import logoImg from '../../assets/logo.jpeg';
 import Modal from '../Modal';
@@ -18,6 +18,8 @@ const navItems = [
   { icon: FileText, label: 'Catálogo', path: '/catalogo' },
   { icon: BarChart3, label: 'Relatórios', path: '/relatorios' },
   { icon: History, label: 'Histórico', path: '/historico' },
+  { icon: BookMarked, label: 'PTCs', path: '/ptc', divider: true },
+  { icon: Microscope, label: 'RVTs', path: '/rvt' },
 ];
 
 export default function AppLayout() {
@@ -65,10 +67,15 @@ export default function AppLayout() {
           </div>
         <nav className="sidebar-nav">
           {navItems.map((item) => (
-            <NavLink key={item.path} to={item.path} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <item.icon size={20} />
-              <span>{item.label}</span>
-            </NavLink>
+            <React.Fragment key={item.path}>
+              {item.divider && (
+                <div style={{ height: 1, background: 'var(--border)', margin: '8px 12px', opacity: 0.5 }} />
+              )}
+              <NavLink to={item.path} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                <item.icon size={20} />
+                <span>{item.label}</span>
+              </NavLink>
+            </React.Fragment>
           ))}
           {/* Link extra para Área do Usuário no final do menu */}
           <NavLink to="/perfil" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: 16 }}>

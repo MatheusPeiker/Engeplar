@@ -18,6 +18,9 @@ import Historico from './pages/Historico'
 import Login from './pages/Login'
 import Perfil from './pages/Perfil'
 import Contatos from './pages/Contatos'
+import DocumentosPTC from './pages/DocumentosPTC'
+import DocumentosRVT from './pages/DocumentosRVT'
+import RedefinirSenha from './pages/RedefinirSenha'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, authLoading } = useAppContext();
@@ -33,6 +36,7 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/redefinir-senha" element={<RedefinirSenha />} />
       <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="obras" element={<Obras />} />
@@ -49,6 +53,8 @@ function App() {
         <Route path="historico" element={<Historico />} />
         <Route path="perfil" element={<Perfil />} />
         <Route path="contatos" element={<Contatos />} />
+        <Route path="ptc" element={<DocumentosPTC />} />
+        <Route path="rvt" element={<DocumentosRVT />} />
       </Route>
     </Routes>
   )

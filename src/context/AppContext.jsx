@@ -75,6 +75,9 @@ const norm = {
     inscricaoEstadual: r.inscricao_estadual, endereco: r.endereco,
     telefone: r.telefone, email: r.email, site: r.site, logo: r.logo
   }),
+  ptc: (r) => ({ ...r }),
+  rvt: (r) => ({ ...r }),
+  tipoServico: (r) => ({ ...r }),
 };
 
 const DEFAULT_EMPRESA = {
@@ -113,6 +116,10 @@ export const AppProvider = ({ children }) => {
   const [compras, setCompras] = useState([]);
   const [historico, setHistorico] = useState([]);
   const [versoes, setVersoes] = useState([]);
+  // ── Módulo Engeplar Documentos ────────────────────────────
+  const [ptcs, setPtcs] = useState([]);
+  const [rvts, setRvts] = useState([]);
+  const [tiposServico, setTiposServico] = useState([]);
   const [notificacoes, setNotificacoes] = useState([
     { id: 1, titulo: 'Bem-vindo', descricao: 'Seus dados estão sendo carregados do banco.', lida: false },
   ]);
@@ -144,13 +151,15 @@ export const AppProvider = ({ children }) => {
     setCronogramas([]); setArquivos([]); setFuncionarios([]);
     setRegistrosDesempenho([]); setCatalogo([]); setTransacoes([]);
     setCompras([]); setHistorico([]); setVersoes([]);
+    setPtcs([]); setRvts([]); setTiposServico([]);
   };
 
   const loadAllData = async (uid) => {
     setDataLoading(true);
     const [
       obrasRes, clientesRes, fornRes, funcRes, orcRes, propRes,
-      cronRes, arqRes, catRes, transRes, comprasRes, despRes, empresaRes, histRes
+      cronRes, arqRes, catRes, transRes, comprasRes, despRes, empresaRes, histRes,
+      ptcRes, rvtRes, tiposServicoRes
     ] = await Promise.all([
       supabase.from('obras').select('*, gastos_despesas(*)').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('clientes').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
@@ -166,6 +175,9 @@ export const AppProvider = ({ children }) => {
       supabase.from('registros_desempenho').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('empresa').select('*').eq('user_id', uid).maybeSingle(),
       supabase.from('historico').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
+      supabase.from('ptc').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('rvt').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('tipos_servico').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     ]);
 
     if (obrasRes.data)    setObras(obrasRes.data.map(norm.obra));
@@ -182,6 +194,9 @@ export const AppProvider = ({ children }) => {
     if (despRes.data)     setRegistrosDesempenho(despRes.data.map(norm.desempenho));
     if (empresaRes.data)  setEmpresa(norm.empresa(empresaRes.data));
     if (histRes.data)     setHistorico(histRes.data.map(norm.historico));
+    if (ptcRes.data)      setPtcs(ptcRes.data.map(norm.ptc));
+    if (rvtRes.data)      setRvts(rvtRes.data.map(norm.rvt));
+    if (tiposServicoRes.data) setTiposServico(tiposServicoRes.data.map(norm.tipoServico));
 
     setDataLoading(false);
   };
@@ -673,6 +688,68 @@ export const AppProvider = ({ children }) => {
     await supabase.from('compras').delete().eq('id', compraId).eq('user_id', uid());
   }, []);
 
+  // ── PTC ───────────────────────────────────────────────────
+  const addPTC = async (dados) => {
+    const tempId = `tmp_${Date.now()}`;
+    const local  = { ...dados, id: tempId, user_id: uid() };
+    setPtcs(prev => [local, ...prev]);
+    const { data, error } = await supabase.from('ptc').insert({ ...dados, user_id: uid() }).select().single();
+    if (error) { setPtcs(prev => prev.filter(p => p.id !== tempId)); return null; }
+    setPtcs(prev => prev.map(p => p.id === tempId ? data : p));
+    return data.id;
+  };
+
+  const updatePTC = async (id, campo, valor) => {
+    setPtcs(prev => prev.map(p => p.id === id ? { ...p, [campo]: valor } : p));
+    await supabase.from('ptc').update({ [campo]: valor, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', uid());
+  };
+
+  const deletePTC = async (id) => {
+    setPtcs(prev => prev.filter(p => p.id !== id));
+    await supabase.from('ptc').delete().eq('id', id).eq('user_id', uid());
+  };
+
+  // ── RVT ───────────────────────────────────────────────────
+  const addRVT = async (dados) => {
+    const tempId = `tmp_${Date.now()}`;
+    const local  = { ...dados, id: tempId, user_id: uid() };
+    setRvts(prev => [local, ...prev]);
+    const { data, error } = await supabase.from('rvt').insert({ ...dados, user_id: uid() }).select().single();
+    if (error) { setRvts(prev => prev.filter(r => r.id !== tempId)); return null; }
+    setRvts(prev => prev.map(r => r.id === tempId ? data : r));
+    return data.id;
+  };
+
+  const updateRVT = async (id, campo, valor) => {
+    setRvts(prev => prev.map(r => r.id === id ? { ...r, [campo]: valor } : r));
+    await supabase.from('rvt').update({ [campo]: valor, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', uid());
+  };
+
+  const deleteRVT = async (id) => {
+    setRvts(prev => prev.filter(r => r.id !== id));
+    await supabase.from('rvt').delete().eq('id', id).eq('user_id', uid());
+  };
+
+  // ── Tipos de Serviço ──────────────────────────────────────
+  const addTipoServico = async (dados) => {
+    const tempId = `tmp_${Date.now()}`;
+    setTiposServico(prev => [{ ...dados, id: tempId }, ...prev]);
+    const { data, error } = await supabase.from('tipos_servico').insert({ ...dados, user_id: uid() }).select().single();
+    if (error) { setTiposServico(prev => prev.filter(t => t.id !== tempId)); return null; }
+    setTiposServico(prev => prev.map(t => t.id === tempId ? data : t));
+    return data.id;
+  };
+
+  const updateTipoServico = async (id, campo, valor) => {
+    setTiposServico(prev => prev.map(t => t.id === id ? { ...t, [campo]: valor } : t));
+    await supabase.from('tipos_servico').update({ [campo]: valor }).eq('id', id).eq('user_id', uid());
+  };
+
+  const deleteTipoServico = async (id) => {
+    setTiposServico(prev => prev.filter(t => t.id !== id));
+    await supabase.from('tipos_servico').delete().eq('id', id).eq('user_id', uid());
+  };
+
   // ── Métricas ──────────────────────────────────────────────
   const getTopClientes = () => {
     const mapa = propostas.reduce((acc, p) => {
@@ -800,6 +877,9 @@ export const AppProvider = ({ children }) => {
       catalogo, addCatalogoItem, updateCatalogoItem, deleteCatalogoItem,
       transacoes, addTransacao, updateTransacao, deleteTransacao,
       compras, addCompra, updateCompra, deleteCompra,
+      ptcs, addPTC, updatePTC, deletePTC,
+      rvts, addRVT, updateRVT, deleteRVT,
+      tiposServico, addTipoServico, updateTipoServico, deleteTipoServico,
       notificacoes, marcarComoLida, getNotificacoesNaoLidas,
       historico, registrarAlteracao, reverterAlteracao,
       versoes, salvarVersao,
