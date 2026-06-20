@@ -193,6 +193,8 @@ export function gerarHTMLRTE(obra, empresa, cronograma = [], proposta = null, te
       <span class="campo-valor">${valor}</span>
     </div>`;
 
+  const rodape = (n) => `<div class="doc-footer"><span>${nomeEmpresa} · ${esc(empresa?.endereco || 'Rua Amazonas, 475 — Rio dos Cedros/SC')} · ${esc(empresa?.telefone || '(47) 3386-0000')} · ${esc(empresa?.email || 'contato@engeplar.com.br')}</span><span>Página ${n}</span></div>`;
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -210,7 +212,7 @@ body {
 
 @page {
   size: A4;
-  margin: 85px 40px 60px 20mm;
+  margin: 85px 40px 60px 40px;
 }
 
 /* ── Cabeçalho fixo ── */
@@ -218,7 +220,7 @@ body {
   position: fixed;
   top: 0; left: 0; right: 0;
   background: #fff;
-  padding: 4px 40px 0 20mm;
+  padding: 4px 40px 0 40px;
   z-index: 200;
 }
 .header-table {
@@ -265,18 +267,22 @@ body {
   padding: 2px 6px;
 }
 
-/* ── Rodapé fixo ── */
+/* ── Página + Rodapé inline ── */
+.pagina {
+  min-height: calc(297mm - 85px - 40px);
+  display: flex;
+  flex-direction: column;
+  page-break-after: always;
+}
 .doc-footer {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  background: #fff;
   border-top: 2px solid #1a3a6b;
   color: #1a3a6b;
   font-size: 8pt;
-  padding: 5px 40px 5px 20mm;
+  padding: 5px 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-top: auto;
 }
 
 /* ── Conteúdo ── */
@@ -289,7 +295,7 @@ body {
   align-items: center;
   min-height: 240mm;
   text-align: center;
-  page-break-after: always;
+  flex: 1;
 }
 .capa-banner {
   width: 100%;
@@ -507,23 +513,9 @@ body {
 .page-break { page-break-after: always; }
 .page-break-inside-avoid { page-break-inside: avoid; }
 
-.barra-lateral {
-  position: fixed;
-  left: 0; top: 0; bottom: 0;
-  width: 10mm;
-  background: #1a3a6b;
-  z-index: 0;
-  print-color-adjust: exact;
-  -webkit-print-color-adjust: exact;
-}
-
-.num-pagina::after {
-  content: counter(page);
-}
-
 @media print {
-  .doc-header, .doc-footer { display: block !important; }
-  .barra-lateral { display: block !important; }
+  .doc-header { display: block !important; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 </style>
 </head>
@@ -533,10 +525,10 @@ body {
 <div class="doc-header">
   <table class="header-table">
     <tr>
-      <td class="logo-cell" rowspan="2">
+      <td rowspan="2" style="background:#1a3a6b !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; color:white; width:18%; text-align:center; padding:4px; border:0.75pt solid #1a3a6b; vertical-align:middle;">
         ${empresa?.logo
-          ? `<img src="${esc(empresa.logo)}" alt="Logo" />`
-          : `<span style="color:white; font-weight:bold; font-size:9pt; text-align:center; display:block;">ENGEPLAR</span>`}
+          ? `<img src="${esc(empresa.logo)}" alt="Logo" style="max-height:42px;max-width:100%;object-fit:contain;filter:brightness(0) invert(1);" />`
+          : `<span style="color:white;font-weight:bold;font-size:9pt;text-align:center;display:block;">ENGEPLAR</span>`}
       </td>
       <td class="doc-title-cell" rowspan="2">
         RELATÓRIO TÉCNICO DE EXECUÇÃO
@@ -549,200 +541,179 @@ body {
   </table>
 </div>
 
-<!-- Rodapé fixo -->
-<div class="doc-footer">
-  <span>${nomeEmpresa} · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · ${esc(empresa?.email || 'contato@engeplar.com.br')}</span>
-  <span>Página <span class="num-pagina"></span></span>
-</div>
-
 <div class="content">
-<div class="barra-lateral"></div>
 
-  <!-- 1. CAPA -->
-  <div class="capa">
-    <div class="capa-banner">
-      ${empresa?.logo ? `<img src="${esc(empresa.logo)}" alt="Logo" />` : ''}
-      <div class="capa-banner-nome">${nomeEmpresa}</div>
+  <!-- PÁGINA 1 — CAPA -->
+  <div class="pagina">
+    <div class="capa">
+      <div class="capa-banner">
+        ${empresa?.logo ? `<img src="${esc(empresa.logo)}" alt="Logo" />` : ''}
+        <div class="capa-banner-nome">${nomeEmpresa}</div>
+      </div>
+      <div class="capa-titulo">Relatório Técnico de Execução</div>
+      <div class="capa-subtitulo">${tipoLabel || esc(obra.nome || '')}</div>
+      <div class="capa-meta">
+        <table>
+          <tr><td>Nº RTE</td><td>${rteNum}</td></tr>
+          <tr><td>Contratante</td><td>${esc(obra.nome)}</td></tr>
+          <tr><td>Local</td><td>${esc(proposta?.clienteEndereco || obra.endereco || '')}</td></tr>
+          <tr><td>PTC Referência</td><td>${ptcRef}</td></tr>
+          <tr><td>Período</td><td>${periodoInicio} a ${periodoFim}</td></tr>
+          <tr><td>Data de Emissão</td><td>${hoje}</td></tr>
+        </table>
+      </div>
     </div>
-    <div class="capa-titulo">Relatório Técnico de Execução</div>
-    <div class="capa-subtitulo">${tipoLabel || esc(obra.nome || '')}</div>
-    <div class="capa-meta">
-      <table>
-        <tr><td>Nº RTE</td><td>${rteNum}</td></tr>
-        <tr><td>Contratante</td><td>${esc(obra.responsavelCliente ? `${obra.nome}` : obra.nome)}</td></tr>
-        <tr><td>Local</td><td>${esc(obra.endereco || '')}</td></tr>
-        <tr><td>PTC Referência</td><td>${ptcRef}</td></tr>
-        <tr><td>Período</td><td>${periodoInicio} a ${periodoFim}</td></tr>
-        <tr><td>Data de Emissão</td><td>${hoje}</td></tr>
-      </table>
-    </div>
+    ${rodape(1)}
   </div>
 
-  <!-- 2. AGRADECIMENTOS -->
-  ${secao(2, 'Agradecimentos', `
-    <p class="texto-justificado" style="margin-bottom:10pt;">
-      A <strong>${nomeEmpresa}</strong> agradece a confiança depositada e a oportunidade de
-      realizar os serviços descritos neste relatório. Expressamos nossa gratidão aos responsáveis
-      do contratante pelo acompanhamento e suporte durante toda a execução.
-    </p>
-    ${obra.responsavelCliente ? `
-    <table class="tabela-contatos" style="max-width:420pt;">
-      <thead>
-        <tr><th>Responsável Contratante</th><th>Empresa / Unidade</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>${esc(obra.responsavelCliente)}</td>
-          <td>${esc(obra.nome || '')}</td>
-        </tr>
-      </tbody>
-    </table>` : ''}`)}
-
-  <!-- 3. INTRODUÇÃO -->
-  ${secao(3, 'Introdução', `
-    <p class="texto-justificado" style="margin-bottom:12pt;">
-      O presente documento tem por finalidade apresentar os dados capturados na execução dos
-      trabalhos de <strong>${esc(obra.descricaoTecnica || tipoLabel || obra.nome || '')}</strong>.
-    </p>
-    <p class="texto-justificado" style="margin-bottom:12pt;">
-      A execução do trabalho apontado ocorreu em <strong>${esc(obra.endereco || '')}</strong>.
-      ${obra.responsavelCliente
-        ? `As atividades foram acompanhadas pelo(a) Sr(a). <strong>${esc(obra.responsavelCliente)}</strong>.`
-        : ''}
-    </p>
-    <div style="margin-top:8pt;">
-      ${campo('Proposta Técnica Comercial', ptcRef)}
-      ${campo('Pedido Nº', esc(obra.pedidoNumero || '___________') + (obra.pedidoData ? `&nbsp;&nbsp;&nbsp;Data: ${fmt(obra.pedidoData)}` : ''))}
-      ${campo('ART Nº', esc(obra.artNumero || '___________') + (obra.artData ? `&nbsp;&nbsp;&nbsp;Data: ${fmt(obra.artData)}` : ''))}
-      ${campo('Nota Fiscal Nº', esc(obra.nfNumero || '___________') + (obra.nfData ? `&nbsp;&nbsp;&nbsp;Data: ${fmt(obra.nfData)}` : ''))}
-      ${tecnicoNome ? campo('Técnico Responsável', `${tecnicoNome}${tecnicoCargo ? ' — ' + tecnicoCargo : ''}`) : ''}
-    </div>`)}
-
-  <!-- 4. DESCRIÇÃO DA ATIVIDADE -->
-  ${secao(4, 'Descrição da Atividade', `
-    <p class="texto-justificado" style="margin-bottom:12pt;">
-      ${esc(obra.descricaoTecnica || `Execução de serviços de ${tipoLabel || 'intervenção técnica'} conforme Proposta Técnica Comercial ${ptcRef}.`)}
-    </p>
-    ${(obra.materialEquipamento || dim.diametro || dim.altura || dim.area) ? `
-    <div class="equip-box">
-      <h3>Dados do Equipamento</h3>
-      ${campo('Estrutura', esc(obra.materialEquipamento || ''))}
-      ${campo('Identificação', esc(obra.nome || ''))}
-      ${campo('Localização', esc(obra.endereco || ''))}
-      ${(dim.diametro || dim.altura || dim.area) ? `
-      <div class="equip-dim">
-        ${dim.diametro ? `<div>Diâmetro: <span>${esc(dim.diametro)}</span></div>` : ''}
-        ${dim.altura ? `<div>Altura: <span>${esc(dim.altura)}</span></div>` : ''}
-        ${dim.area ? `<div>Área: <span>${esc(dim.area)} m²</span></div>` : ''}
-      </div>` : ''}
-    </div>` : ''}
-    ${blocoTecnico ? `<div style="margin-top:12pt;">${blocoTecnico}</div>` : ''}`)}
-
-  <!-- 5. ESTRUTURA (fotos antes da intervenção) -->
-  ${secao(5, 'Estrutura — Condição Anterior à Intervenção', `
-    <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
-      Registro fotográfico das condições do equipamento antes do início dos serviços.
-    </p>
-    ${fotoPlaceholder('EST', 4)}`)}
-
-  <!-- 6. PROCEDIMENTO (fotos de execução) -->
-  ${secao(6, 'Procedimento — Etapas de Execução', `
-    <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
-      Registro fotográfico das etapas de execução dos serviços.
-    </p>
-    ${cronograma.length > 0
-      ? cronograma.map((e, i) => `
-        <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">${i + 1}. ${esc(e.etapa)}</p>
-        ${fotoPlaceholder('PROC-' + (i+1), 2)}
-      `).join('')
-      : fotoPlaceholder('PROC', 4)}`)}
-
-  <!-- 7. ENSAIOS / TESTES -->
-  ${secao(7, 'Ensaios e Testes', `
-    <div style="margin-bottom:12pt;">${blocoEnsaio}</div>
-    ${fotoPlaceholder('ENS', 2)}`)}
-
-  <!-- 8. GARANTIA -->
-  ${secao(8, 'Garantia', `
-    <div class="garantia-box">
-      <p style="margin-bottom:8pt;">
-        Nossa intervenção deve atender e garantir os requisitos de desempenho do sistema aplicado por
-        <strong>${obra.garantiaMeses || 36} MESES</strong> a partir da data de emissão deste relatório.
-      </p>
-      <p>
-        Este equipamento deverá passar por inspeção periódica a cada
-        <strong>${obra.inspecaoMeses || 12} MESES</strong>.
-      </p>
-    </div>`)}
-
-  <!-- 9. IMAGENS DO EQUIPAMENTO (pós-serviço) -->
-  ${secao(9, 'Imagens do Equipamento — Condição Final', `
-    <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
-      Registro fotográfico do equipamento após a conclusão dos serviços.
-    </p>
-    ${fotoPlaceholder('FINAL', 4)}`)}
-
-  <!-- 10. ORDEM DE COMPRA / PEDIDO -->
-  ${secao(10, 'Ordem de Compra / Pedido', `
-    <div class="ref-box">
-      ${campo('Pedido Nº', esc(obra.pedidoNumero || '___________________'))}
-      ${campo('Data do Pedido', obra.pedidoData ? fmt(obra.pedidoData) : '___/___/______')}
-      ${campo('Contratante', esc(obra.nome || ''))}
+  <!-- PÁGINA 2 — AGRADECIMENTOS + INTRODUÇÃO -->
+  <div class="pagina">
+    <div style="flex:1">
+      ${secao(2, 'Agradecimentos', `
+        <p class="texto-justificado" style="margin-bottom:10pt;">
+          A <strong>${nomeEmpresa}</strong> agradece a confiança depositada e a oportunidade de
+          realizar os serviços descritos neste relatório. Expressamos nossa gratidão aos responsáveis
+          do contratante pelo acompanhamento e suporte durante toda a execução.
+        </p>
+        ${obra.responsavelCliente ? `
+        <table class="tabela-contatos" style="max-width:420pt;">
+          <thead><tr><th>Responsável Contratante</th><th>Empresa / Unidade</th></tr></thead>
+          <tbody>
+            <tr><td>${esc(obra.responsavelCliente)}</td><td>${esc(obra.nome || '')}</td></tr>
+          </tbody>
+        </table>` : ''}`)}
+      ${secao(3, 'Introdução', `
+        <p class="texto-justificado" style="margin-bottom:12pt;">
+          O presente documento tem por finalidade apresentar os dados capturados na execução dos
+          trabalhos de <strong>${esc(obra.descricaoTecnica || tipoLabel || obra.nome || '')}</strong>.
+        </p>
+        <p class="texto-justificado" style="margin-bottom:12pt;">
+          A execução do trabalho apontado ocorreu em <strong>${esc(proposta?.clienteEndereco || obra.endereco || '')}</strong>.
+          ${obra.responsavelCliente ? `As atividades foram acompanhadas pelo(a) Sr(a). <strong>${esc(obra.responsavelCliente)}</strong>.` : ''}
+        </p>
+        <div style="margin-top:8pt;">
+          ${campo('Proposta Técnica Comercial', ptcRef)}
+          ${campo('Pedido Nº', esc(obra.pedidoNumero || '___________') + (obra.pedidoData ? `&nbsp;&nbsp;&nbsp;Data: ${fmt(obra.pedidoData)}` : ''))}
+          ${campo('ART Nº', esc(obra.artNumero || '___________') + (obra.artData ? `&nbsp;&nbsp;&nbsp;Data: ${fmt(obra.artData)}` : ''))}
+          ${campo('Nota Fiscal Nº', esc(obra.nfNumero || '___________') + (obra.nfData ? `&nbsp;&nbsp;&nbsp;Data: ${fmt(obra.nfData)}` : ''))}
+          ${tecnicoNome ? campo('Técnico Responsável', `${tecnicoNome}${tecnicoCargo ? ' — ' + tecnicoCargo : ''}`) : ''}
+        </div>`)}
     </div>
-    <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
-      Cópia do documento de compra original disponível no arquivo da obra.
-    </p>`)}
+    ${rodape(2)}
+  </div>
 
-  <!-- 11. PROPOSTA COMERCIAL -->
-  ${secao(11, 'Proposta Técnica Comercial', `
-    <div class="ref-box">
-      ${campo('PTC Nº', ptcRef)}
-      ${proposta?.nome ? campo('Descrição', esc(proposta.nome)) : ''}
+  <!-- PÁGINA 3 — DESCRIÇÃO DA ATIVIDADE -->
+  <div class="pagina">
+    <div style="flex:1">
+      ${secao(4, 'Descrição da Atividade', `
+        <p class="texto-justificado" style="margin-bottom:12pt;">
+          ${esc(obra.descricaoTecnica || `Execução de serviços de ${tipoLabel || 'intervenção técnica'} conforme Proposta Técnica Comercial ${ptcRef}.`)}
+        </p>
+        ${(obra.materialEquipamento || dim.diametro || dim.altura || dim.area) ? `
+        <div class="equip-box">
+          <h3>Dados do Equipamento</h3>
+          ${campo('Estrutura', esc(obra.materialEquipamento || ''))}
+          ${campo('Identificação', esc(obra.nome || ''))}
+          ${campo('Localização', esc(proposta?.clienteEndereco || obra.endereco || ''))}
+          ${(dim.diametro || dim.altura || dim.area) ? `
+          <div class="equip-dim">
+            ${dim.diametro ? `<div>Diâmetro: <span>${esc(dim.diametro)}</span></div>` : ''}
+            ${dim.altura ? `<div>Altura: <span>${esc(dim.altura)}</span></div>` : ''}
+            ${dim.area ? `<div>Área: <span>${esc(dim.area)} m²</span></div>` : ''}
+          </div>` : ''}
+        </div>` : ''}
+        ${blocoTecnico ? `<div style="margin-top:12pt;">${blocoTecnico}</div>` : ''}`)}
     </div>
-    <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
-      Proposta técnica comercial conforme arquivo aprovado pelo contratante.
-    </p>`)}
+    ${rodape(3)}
+  </div>
 
-  <!-- 12. CONTATOS E CORPO TÉCNICO -->
-  ${secao(12, 'Contatos e Corpo Técnico', `
-    <table class="tabela-contatos">
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th>Cargo</th>
-          <th>E-mail</th>
-          <th>Telefone</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>John Clovis Peiker</td>
-          <td>Diretor Técnico</td>
-          <td>john@engeplar.com.br</td>
-          <td>(47) 9 8815-3943</td>
-        </tr>
-        <tr>
-          <td>Edson James Peiker</td>
-          <td>Diretor</td>
-          <td>james@engeplar.com.br</td>
-          <td>(47) 9 8829-3476</td>
-        </tr>
-        <tr>
-          <td>Matheus Peiker</td>
-          <td>Gerente de Fábrica</td>
-          <td>matheus@engeplar.com.br</td>
-          <td>(47) 9 9637-0326</td>
-        </tr>
-        ${tecnicos.map(t => t.nome !== 'Matheus Peiker' ? `
-        <tr>
-          <td>${esc(t.nome)}</td>
-          <td>${esc(t.funcao || '')}</td>
-          <td>—</td>
-          <td>—</td>
-        </tr>` : '').join('')}
-      </tbody>
-    </table>
-`)}
+  <!-- PÁGINA 4 — ESTRUTURA (condição anterior) -->
+  <div class="pagina">
+    <div style="flex:1">
+      ${secao(5, 'Estrutura — Condição Anterior à Intervenção', `
+        <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
+          Registro fotográfico das condições do equipamento antes do início dos serviços.
+        </p>
+        ${fotoPlaceholder('EST', 4)}`)}
+    </div>
+    ${rodape(4)}
+  </div>
+
+  <!-- PÁGINA 5 — PROCEDIMENTO -->
+  <div class="pagina">
+    <div style="flex:1">
+      ${secao(6, 'Procedimento — Etapas de Execução', `
+        <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
+          Registro fotográfico das etapas de execução dos serviços.
+        </p>
+        ${cronograma.length > 0
+          ? cronograma.map((e, i) => `
+            <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">${i + 1}. ${esc(e.etapa)}</p>
+            ${fotoPlaceholder('PROC-' + (i + 1), 2)}`).join('')
+          : fotoPlaceholder('PROC', 4)}`)}
+    </div>
+    ${rodape(5)}
+  </div>
+
+  <!-- PÁGINA 6 — ENSAIOS + GARANTIA -->
+  <div class="pagina">
+    <div style="flex:1">
+      ${secao(7, 'Ensaios e Testes', `
+        <div style="margin-bottom:12pt;">${blocoEnsaio}</div>
+        ${fotoPlaceholder('ENS', 2)}`)}
+      ${secao(8, 'Garantia', `
+        <div class="garantia-box">
+          <p style="margin-bottom:8pt;">
+            Nossa intervenção deve atender e garantir os requisitos de desempenho do sistema aplicado por
+            <strong>${obra.garantiaMeses || 36} MESES</strong> a partir da data de emissão deste relatório.
+          </p>
+          <p>Este equipamento deverá passar por inspeção periódica a cada <strong>${obra.inspecaoMeses || 12} MESES</strong>.</p>
+        </div>`)}
+    </div>
+    ${rodape(6)}
+  </div>
+
+  <!-- PÁGINA 7 — IMAGENS FINAL + PEDIDO + PROPOSTA + CONTATOS -->
+  <div class="pagina">
+    <div style="flex:1">
+      ${secao(9, 'Imagens do Equipamento — Condição Final', `
+        <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
+          Registro fotográfico do equipamento após a conclusão dos serviços.
+        </p>
+        ${fotoPlaceholder('FINAL', 4)}`)}
+      ${secao(10, 'Ordem de Compra / Pedido', `
+        <div class="ref-box">
+          ${campo('Pedido Nº', esc(obra.pedidoNumero || '___________________'))}
+          ${campo('Data do Pedido', obra.pedidoData ? fmt(obra.pedidoData) : '___/___/______')}
+          ${campo('Contratante', esc(obra.nome || ''))}
+        </div>
+        <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
+          Cópia do documento de compra original disponível no arquivo da obra.
+        </p>`)}
+      ${secao(11, 'Proposta Técnica Comercial', `
+        <div class="ref-box">
+          ${campo('PTC Nº', ptcRef)}
+          ${proposta?.nome ? campo('Descrição', esc(proposta.nome)) : ''}
+        </div>
+        <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
+          Proposta técnica comercial conforme arquivo aprovado pelo contratante.
+        </p>`)}
+      ${secao(12, 'Contatos e Corpo Técnico', `
+        <table class="tabela-contatos">
+          <thead>
+            <tr><th>Nome</th><th>Cargo</th><th>E-mail</th><th>Telefone</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>John Clovis Peiker</td><td>Diretor Técnico</td><td>john@engeplar.com.br</td><td>(47) 9 8815-3943</td></tr>
+            <tr><td>Edson James Peiker</td><td>Diretor</td><td>james@engeplar.com.br</td><td>(47) 9 8829-3476</td></tr>
+            <tr><td>Matheus Peiker</td><td>Gerente de Fábrica</td><td>matheus@engeplar.com.br</td><td>(47) 9 9637-0326</td></tr>
+            ${tecnicos.map(t => t.nome !== 'Matheus Peiker' ? `
+            <tr><td>${esc(t.nome)}</td><td>${esc(t.funcao || '')}</td><td>—</td><td>—</td></tr>` : '').join('')}
+          </tbody>
+        </table>`)}
+    </div>
+    ${rodape(7)}
+  </div>
 
 </div>
 

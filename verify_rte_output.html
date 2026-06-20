@@ -40,8 +40,10 @@ body {
   width: 18%;
   text-align: center;
   padding: 4px;
-  background: #1a3a6b;
+  background: #1a3a6b !important;
   color: #fff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 .header-table .logo-cell img {
   max-height: 42px;
@@ -68,11 +70,14 @@ body {
   padding: 2px 6px;
 }
 
-/* ── Rodapé fixo ── */
+/* ── Página + Rodapé inline ── */
+.pagina {
+  min-height: calc(297mm - 85px - 40px);
+  display: flex;
+  flex-direction: column;
+  page-break-after: always;
+}
 .doc-footer {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  background: #fff;
   border-top: 2px solid #1a3a6b;
   color: #1a3a6b;
   font-size: 8pt;
@@ -80,6 +85,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-top: auto;
 }
 
 /* ── Conteúdo ── */
@@ -92,7 +98,7 @@ body {
   align-items: center;
   min-height: 240mm;
   text-align: center;
-  page-break-after: always;
+  flex: 1;
 }
 .capa-banner {
   width: 100%;
@@ -311,20 +317,19 @@ body {
 .page-break-inside-avoid { page-break-inside: avoid; }
 
 @media print {
-  .doc-header, .doc-footer { display: block !important; }
+  .doc-header { display: block !important; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 </style>
 </head>
 <body>
 
-<div style="position:fixed;left:0;top:0;bottom:0;width:8px;background:#1a3a6b;z-index:300;print-color-adjust:exact;-webkit-print-color-adjust:exact;"></div>
-
 <!-- Cabeçalho fixo -->
 <div class="doc-header">
   <table class="header-table">
     <tr>
-      <td class="logo-cell" rowspan="2">
-        <img src="http://localhost:5173/src/assets/logo.jpeg" alt="Logo" />
+      <td rowspan="2" style="background:#1a3a6b !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; color:white; width:18%; text-align:center; padding:4px; border:0.75pt solid #1a3a6b; vertical-align:middle;">
+        <img src="http://localhost:5173/src/assets/logo.jpeg" alt="Logo" style="max-height:42px;max-width:100%;object-fit:contain;filter:brightness(0) invert(1);" />
       </td>
       <td class="doc-title-cell" rowspan="2">
         RELATÓRIO TÉCNICO DE EXECUÇÃO
@@ -337,134 +342,131 @@ body {
   </table>
 </div>
 
-<!-- Rodapé fixo -->
-<div class="doc-footer">
-  <span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span>
-  <span>Página</span>
-</div>
-
 <div class="content">
 
-  <!-- 1. CAPA -->
-  <div class="capa">
-    <div class="capa-banner">
-      <img src="http://localhost:5173/src/assets/logo.jpeg" alt="Logo" />
-      <div class="capa-banner-nome">Engeplar Indústria e Comércio Ltda</div>
+  <!-- PÁGINA 1 — CAPA -->
+  <div class="pagina">
+    <div class="capa">
+      <div class="capa-banner">
+        <img src="http://localhost:5173/src/assets/logo.jpeg" alt="Logo" />
+        <div class="capa-banner-nome">Engeplar</div>
+      </div>
+      <div class="capa-titulo">Relatório Técnico de Execução</div>
+      <div class="capa-subtitulo">Tratamento e Pintura Anticorrosiva</div>
+      <div class="capa-meta">
+        <table>
+          <tr><td>Nº RTE</td><td>RTE-0019.12.25 REV00</td></tr>
+          <tr><td>Contratante</td><td>BRF — Tanque TQ-01</td></tr>
+          <tr><td>Local</td><td>Rua das Indústrias, 100 — Tatuí/SP</td></tr>
+          <tr><td>PTC Referência</td><td>PTC-0012.11.25</td></tr>
+          <tr><td>Período</td><td>10/11/2025 a 16/11/2025</td></tr>
+          <tr><td>Data de Emissão</td><td>20/06/2026</td></tr>
+        </table>
+      </div>
     </div>
-    <div class="capa-titulo">Relatório Técnico de Execução</div>
-    <div class="capa-subtitulo">Tratamento e Pintura Anticorrosiva</div>
-    <div class="capa-meta">
-      <table>
-        <tr><td>Nº RTE</td><td>RTE-0019.12.25 REV00</td></tr>
-        <tr><td>Contratante</td><td>BRF — Tanque TQ-01</td></tr>
-        <tr><td>Local</td><td>Rua das Indústrias, 100 — Tatuí/SP</td></tr>
-        <tr><td>PTC Referência</td><td>PTC-0012.11.25</td></tr>
-        <tr><td>Período</td><td>10/11/2025 a 16/11/2025</td></tr>
-        <tr><td>Data de Emissão</td><td>20/06/2026</td></tr>
-      </table>
-    </div>
+    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 1</span></div>
   </div>
 
-  <!-- 2. AGRADECIMENTOS -->
-  
+  <!-- PÁGINA 2 — AGRADECIMENTOS + INTRODUÇÃO -->
+  <div class="pagina">
+    <div style="flex:1">
+      
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">2.</span> Agradecimentos</h2>
       
-    <p class="texto-justificado" style="margin-bottom:10pt;">
-      A <strong>Engeplar</strong> agradece a confiança depositada e a oportunidade de
-      realizar os serviços descritos neste relatório. Expressamos nossa gratidão aos responsáveis
-      do contratante pelo acompanhamento e suporte durante toda a execução.
-    </p>
-    
-    <table class="tabela-contatos" style="max-width:420pt;">
-      <thead>
-        <tr><th>Responsável Contratante</th><th>Empresa / Unidade</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Carlos Silva</td>
-          <td>BRF — Tanque TQ-01</td>
-        </tr>
-      </tbody>
-    </table>
+        <p class="texto-justificado" style="margin-bottom:10pt;">
+          A <strong>Engeplar</strong> agradece a confiança depositada e a oportunidade de
+          realizar os serviços descritos neste relatório. Expressamos nossa gratidão aos responsáveis
+          do contratante pelo acompanhamento e suporte durante toda a execução.
+        </p>
+        
+        <table class="tabela-contatos" style="max-width:420pt;">
+          <thead><tr><th>Responsável Contratante</th><th>Empresa / Unidade</th></tr></thead>
+          <tbody>
+            <tr><td>Carlos Silva</td><td>BRF — Tanque TQ-01</td></tr>
+          </tbody>
+        </table>
     </div>
-
-  <!-- 3. INTRODUÇÃO -->
-  
+      
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">3.</span> Introdução</h2>
       
-    <p class="texto-justificado" style="margin-bottom:12pt;">
-      O presente documento tem por finalidade apresentar os dados capturados na execução dos
-      trabalhos de <strong>Tratamento anticorrosivo interno e externo do tanque TQ-01.</strong>.
-    </p>
-    <p class="texto-justificado" style="margin-bottom:12pt;">
-      A execução do trabalho apontado ocorreu em <strong>Rua das Indústrias, 100 — Tatuí/SP</strong>.
-      As atividades foram acompanhadas pelo(a) Sr(a). <strong>Carlos Silva</strong>.
-    </p>
-    <div style="margin-top:8pt;">
-      
+        <p class="texto-justificado" style="margin-bottom:12pt;">
+          O presente documento tem por finalidade apresentar os dados capturados na execução dos
+          trabalhos de <strong>Tratamento anticorrosivo interno e externo do tanque TQ-01.</strong>.
+        </p>
+        <p class="texto-justificado" style="margin-bottom:12pt;">
+          A execução do trabalho apontado ocorreu em <strong>Rua das Indústrias, 100 — Tatuí/SP</strong>.
+          As atividades foram acompanhadas pelo(a) Sr(a). <strong>Carlos Silva</strong>.
+        </p>
+        <div style="margin-top:8pt;">
+          
     <div class="campo-linha">
       <span class="campo-label">Proposta Técnica Comercial:</span>
       <span class="campo-valor">PTC-0012.11.25</span>
     </div>
-      
+          
     <div class="campo-linha">
       <span class="campo-label">Pedido Nº:</span>
       <span class="campo-valor">PED-2025-001</span>
     </div>
-      
+          
     <div class="campo-linha">
       <span class="campo-label">ART Nº:</span>
       <span class="campo-valor">ART-2025-001</span>
     </div>
-      
+          
     <div class="campo-linha">
       <span class="campo-label">Nota Fiscal Nº:</span>
       <span class="campo-valor">NF-001234</span>
     </div>
-      
+          
     <div class="campo-linha">
       <span class="campo-label">Técnico Responsável:</span>
       <span class="campo-valor">João Peiker — Técnico de Revestimento</span>
     </div>
+        </div>
     </div>
     </div>
+    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 2</span></div>
+  </div>
 
-  <!-- 4. DESCRIÇÃO DA ATIVIDADE -->
-  
+  <!-- PÁGINA 3 — DESCRIÇÃO DA ATIVIDADE -->
+  <div class="pagina">
+    <div style="flex:1">
+      
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">4.</span> Descrição da Atividade</h2>
       
-    <p class="texto-justificado" style="margin-bottom:12pt;">
-      Tratamento anticorrosivo interno e externo do tanque TQ-01.
-    </p>
-    
-    <div class="equip-box">
-      <h3>Dados do Equipamento</h3>
-      
+        <p class="texto-justificado" style="margin-bottom:12pt;">
+          Tratamento anticorrosivo interno e externo do tanque TQ-01.
+        </p>
+        
+        <div class="equip-box">
+          <h3>Dados do Equipamento</h3>
+          
     <div class="campo-linha">
       <span class="campo-label">Estrutura:</span>
       <span class="campo-valor"></span>
     </div>
-      
+          
     <div class="campo-linha">
       <span class="campo-label">Identificação:</span>
       <span class="campo-valor">BRF — Tanque TQ-01</span>
     </div>
-      
+          
     <div class="campo-linha">
       <span class="campo-label">Localização:</span>
       <span class="campo-valor">Rua das Indústrias, 100 — Tatuí/SP</span>
     </div>
-      
-      <div class="equip-dim">
-        <div>Diâmetro: <span>3,2 m</span></div>
-        <div>Altura: <span>4,5 m</span></div>
-        <div>Área: <span>45 m² m²</span></div>
-      </div>
-    </div>
-    <div style="margin-top:12pt;">
+          
+          <div class="equip-dim">
+            <div>Diâmetro: <span>3,2 m</span></div>
+            <div>Altura: <span>4,5 m</span></div>
+            <div>Área: <span>45 m² m²</span></div>
+          </div>
+        </div>
+        <div style="margin-top:12pt;">
           <table style="width:100%;border-collapse:collapse;margin-top:6pt;"><tr><td style="font-weight:700;color:#374151;padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;white-space:nowrap;font-size:10pt;">Produto / Sistema</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Eposeal 300</td></tr><tr><td style="font-weight:700;color:#374151;padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;white-space:nowrap;font-size:10pt;">Fabricante</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Sika</td></tr><tr><td style="font-weight:700;color:#374151;padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;white-space:nowrap;font-size:10pt;">Preparo de Superfície</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Sa 2,5</td></tr><tr><td style="font-weight:700;color:#374151;padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;white-space:nowrap;font-size:10pt;">Sistema de Aplicação</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Airless</td></tr></table>
           
           <p style="font-weight:700;font-size:10pt;margin:10pt 0 4pt;color:#1E3A8A;">Esquema de Pintura</p>
@@ -494,16 +496,21 @@ body {
           </table>
           <p style="font-size:10pt;font-weight:700;margin-top:6pt;">Espessura Total Seca: <span style="color:#1E3A8A;">225 µm</span></p></div>
     </div>
+    </div>
+    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 3</span></div>
+  </div>
 
-  <!-- 5. ESTRUTURA (fotos antes da intervenção) -->
-  
+  <!-- PÁGINA 4 — ESTRUTURA (condição anterior) -->
+  <div class="pagina">
+    <div style="flex:1">
+      
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">5.</span> Estrutura — Condição Anterior à Intervenção</h2>
       
-    <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
-      Registro fotográfico das condições do equipamento antes do início dos serviços.
-    </p>
-    <div class="fotos-grid">
+        <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
+          Registro fotográfico das condições do equipamento antes do início dos serviços.
+        </p>
+        <div class="fotos-grid">
         <div class="foto-box">
           <div class="foto-placeholder">
             <span>📷 Foto EST 1</span>
@@ -533,18 +540,23 @@ body {
           <p class="foto-legenda">Legenda da foto 4</p>
         </div></div>
     </div>
+    </div>
+    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 4</span></div>
+  </div>
 
-  <!-- 6. PROCEDIMENTO (fotos de execução) -->
-  
+  <!-- PÁGINA 5 — PROCEDIMENTO -->
+  <div class="pagina">
+    <div style="flex:1">
+      
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">6.</span> Procedimento — Etapas de Execução</h2>
       
-    <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
-      Registro fotográfico das etapas de execução dos serviços.
-    </p>
-    
-        <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">1. Preparação de Superfície</p>
-        <div class="fotos-grid">
+        <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
+          Registro fotográfico das etapas de execução dos serviços.
+        </p>
+        
+            <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">1. Preparação de Superfície</p>
+            <div class="fotos-grid">
         <div class="foto-box">
           <div class="foto-placeholder">
             <span>📷 Foto PROC-1 1</span>
@@ -559,9 +571,8 @@ body {
           </div>
           <p class="foto-legenda">Legenda da foto 2</p>
         </div></div>
-      
-        <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">2. Aplicação do Primer</p>
-        <div class="fotos-grid">
+            <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">2. Aplicação do Primer</p>
+            <div class="fotos-grid">
         <div class="foto-box">
           <div class="foto-placeholder">
             <span>📷 Foto PROC-2 1</span>
@@ -576,9 +587,8 @@ body {
           </div>
           <p class="foto-legenda">Legenda da foto 2</p>
         </div></div>
-      
-        <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">3. Aplicação da Camada Final</p>
-        <div class="fotos-grid">
+            <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">3. Aplicação da Camada Final</p>
+            <div class="fotos-grid">
         <div class="foto-box">
           <div class="foto-placeholder">
             <span>📷 Foto PROC-3 1</span>
@@ -593,21 +603,25 @@ body {
           </div>
           <p class="foto-legenda">Legenda da foto 2</p>
         </div></div>
-      
     </div>
+    </div>
+    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 5</span></div>
+  </div>
 
-  <!-- 7. ENSAIOS / TESTES -->
-  
+  <!-- PÁGINA 6 — ENSAIOS + GARANTIA -->
+  <div class="pagina">
+    <div style="flex:1">
+      
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">7.</span> Ensaios e Testes</h2>
       
-    <div style="margin-bottom:12pt;"><p style="margin-bottom:8pt;font-size:10.5pt;">Leitura de espessura de película seca por ultrassom — conforme ficha técnica do fabricante.</p>
+        <div style="margin-bottom:12pt;"><p style="margin-bottom:8pt;font-size:10.5pt;">Leitura de espessura de película seca por ultrassom — conforme ficha técnica do fabricante.</p>
           <table style="width:100%;border-collapse:collapse;max-width:360pt;">
             <thead><tr style="background:#1E3A8A;color:#fff;"><th style="padding:5pt 8pt;font-size:9pt;text-align:left;">Camada</th><th style="padding:5pt 8pt;font-size:9pt;text-align:right;">Espessura Seca</th></tr></thead>
             <tbody><tr><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Camada 1 — Primer epóxi</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;font-weight:700;">75 µm</td></tr><tr><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Camada 2 — Eposeal 300</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;font-weight:700;">150 µm</td></tr></tbody>
           </table>
           <p style="font-size:10pt;font-weight:700;margin-top:8pt;">Total: 225 µm</p></div>
-    <div class="fotos-grid">
+        <div class="fotos-grid">
         <div class="foto-box">
           <div class="foto-placeholder">
             <span>📷 Foto ENS 1</span>
@@ -623,33 +637,33 @@ body {
           <p class="foto-legenda">Legenda da foto 2</p>
         </div></div>
     </div>
-
-  <!-- 8. GARANTIA -->
-  
+      
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">8.</span> Garantia</h2>
       
-    <div class="garantia-box">
-      <p style="margin-bottom:8pt;">
-        Nossa intervenção deve atender e garantir os requisitos de desempenho do sistema aplicado por
-        <strong>36 MESES</strong> a partir da data de emissão deste relatório.
-      </p>
-      <p>
-        Este equipamento deverá passar por inspeção periódica a cada
-        <strong>12 MESES</strong>.
-      </p>
+        <div class="garantia-box">
+          <p style="margin-bottom:8pt;">
+            Nossa intervenção deve atender e garantir os requisitos de desempenho do sistema aplicado por
+            <strong>36 MESES</strong> a partir da data de emissão deste relatório.
+          </p>
+          <p>Este equipamento deverá passar por inspeção periódica a cada <strong>12 MESES</strong>.</p>
+        </div>
     </div>
     </div>
+    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 6</span></div>
+  </div>
 
-  <!-- 9. IMAGENS DO EQUIPAMENTO (pós-serviço) -->
-  
+  <!-- PÁGINA 7 — IMAGENS FINAL + PEDIDO + PROPOSTA + CONTATOS -->
+  <div class="pagina">
+    <div style="flex:1">
+      
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">9.</span> Imagens do Equipamento — Condição Final</h2>
       
-    <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
-      Registro fotográfico do equipamento após a conclusão dos serviços.
-    </p>
-    <div class="fotos-grid">
+        <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
+          Registro fotográfico do equipamento após a conclusão dos serviços.
+        </p>
+        <div class="fotos-grid">
         <div class="foto-box">
           <div class="foto-placeholder">
             <span>📷 Foto FINAL 1</span>
@@ -679,100 +693,71 @@ body {
           <p class="foto-legenda">Legenda da foto 4</p>
         </div></div>
     </div>
-
-  <!-- 10. ORDEM DE COMPRA / PEDIDO -->
-  
+      
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">10.</span> Ordem de Compra / Pedido</h2>
       
-    <div class="ref-box">
-      
+        <div class="ref-box">
+          
     <div class="campo-linha">
       <span class="campo-label">Pedido Nº:</span>
       <span class="campo-valor">PED-2025-001</span>
     </div>
-      
+          
     <div class="campo-linha">
       <span class="campo-label">Data do Pedido:</span>
       <span class="campo-valor">___/___/______</span>
     </div>
-      
+          
     <div class="campo-linha">
       <span class="campo-label">Contratante:</span>
       <span class="campo-valor">BRF — Tanque TQ-01</span>
     </div>
+        </div>
+        <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
+          Cópia do documento de compra original disponível no arquivo da obra.
+        </p>
     </div>
-    <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
-      Cópia do documento de compra original disponível no arquivo da obra.
-    </p>
-    </div>
-
-  <!-- 11. PROPOSTA COMERCIAL -->
-  
+      
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">11.</span> Proposta Técnica Comercial</h2>
       
-    <div class="ref-box">
-      
+        <div class="ref-box">
+          
     <div class="campo-linha">
       <span class="campo-label">PTC Nº:</span>
       <span class="campo-valor">PTC-0012.11.25</span>
     </div>
-      
+          
     <div class="campo-linha">
       <span class="campo-label">Descrição:</span>
       <span class="campo-valor">PTC-2025-001</span>
     </div>
+        </div>
+        <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
+          Proposta técnica comercial conforme arquivo aprovado pelo contratante.
+        </p>
     </div>
-    <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
-      Proposta técnica comercial conforme arquivo aprovado pelo contratante.
-    </p>
-    </div>
-
-  <!-- 12. CONTATOS E CORPO TÉCNICO -->
-  
+      
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">12.</span> Contatos e Corpo Técnico</h2>
       
-    <table class="tabela-contatos">
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th>Cargo</th>
-          <th>E-mail</th>
-          <th>Telefone</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>John Clovis Peiker</td>
-          <td>Diretor Técnico</td>
-          <td>john@engeplar.com.br</td>
-          <td>(47) 9 8815-3943</td>
-        </tr>
-        <tr>
-          <td>Edson James Peiker</td>
-          <td>Diretor</td>
-          <td>james@engeplar.com.br</td>
-          <td>(47) 9 8829-3476</td>
-        </tr>
-        <tr>
-          <td>Matheus Peiker</td>
-          <td>Gerente de Fábrica</td>
-          <td>matheus@engeplar.com.br</td>
-          <td>(47) 9 9637-0326</td>
-        </tr>
-        
-        <tr>
-          <td>João Peiker</td>
-          <td>Técnico de Revestimento</td>
-          <td>—</td>
-          <td>—</td>
-        </tr>
-      </tbody>
-    </table>
-
+        <table class="tabela-contatos">
+          <thead>
+            <tr><th>Nome</th><th>Cargo</th><th>E-mail</th><th>Telefone</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>John Clovis Peiker</td><td>Diretor Técnico</td><td>john@engeplar.com.br</td><td>(47) 9 8815-3943</td></tr>
+            <tr><td>Edson James Peiker</td><td>Diretor</td><td>james@engeplar.com.br</td><td>(47) 9 8829-3476</td></tr>
+            <tr><td>Matheus Peiker</td><td>Gerente de Fábrica</td><td>matheus@engeplar.com.br</td><td>(47) 9 9637-0326</td></tr>
+            
+            <tr><td>João Peiker</td><td>Técnico de Revestimento</td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table>
     </div>
+    </div>
+    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 7</span></div>
+  </div>
 
 </div>
 
