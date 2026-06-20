@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>RTE-0019.12.25 REV00</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Calibri', 'Arial', sans-serif;
+  font-size: 10.5pt;
+  color: #000;
+  background: #fff;
+}
+
+@page {
+  size: A4;
+  margin: 85px 40px 60px 40px;
+}
+
+/* ── Cabeçalho fixo ── */
+.doc-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  background: #fff;
+  padding: 4px 40px 0 40px;
+  z-index: 200;
+}
+.header-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+}
+.header-table td {
+  border: 0.75pt solid #1a3a6b;
+  padding: 3px 6px;
+  vertical-align: middle;
+}
+.header-table .logo-cell {
+  width: 18%;
+  text-align: center;
+  padding: 4px;
+  background: #1a3a6b;
+  color: #fff;
+}
+.header-table .logo-cell img {
+  max-height: 42px;
+  max-width: 100%;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+.header-table .logo-cell .emp-nome {
+  font-size: 10pt;
+  font-weight: 700;
+  color: #fff;
+}
+.header-table .doc-title-cell {
+  width: 52%;
+  text-align: center;
+  font-size: 9.5pt;
+  font-weight: 700;
+  color: #1a3a6b;
+  letter-spacing: 0.02em;
+  background: #f0f4ff;
+}
+.header-table .doc-meta td {
+  font-size: 8.5pt;
+  padding: 2px 6px;
+}
+
+/* ── Rodapé fixo ── */
+.doc-footer {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #fff;
+  border-top: 2px solid #1a3a6b;
+  color: #1a3a6b;
+  font-size: 8pt;
+  padding: 5px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ── Conteúdo ── */
+.content { margin-top: 0; }
+
+/* ── Capa ── */
+.capa {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 240mm;
+  text-align: center;
+  page-break-after: always;
+}
+.capa-banner {
+  width: 100%;
+  background: #1a3a6b;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  margin-bottom: 28pt;
+  align-self: stretch;
+}
+.capa-banner img {
+  max-height: 55px;
+  max-width: 200px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  margin-bottom: 8px;
+}
+.capa-banner-nome {
+  font-size: 13pt;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.capa-logo img {
+  max-height: 70px;
+  max-width: 220px;
+  object-fit: contain;
+  margin-bottom: 20pt;
+}
+.capa-logo .emp-nome-capa {
+  font-size: 20pt;
+  font-weight: 900;
+  color: #1E3A8A;
+  letter-spacing: 0.05em;
+  margin-bottom: 20pt;
+}
+.capa-titulo {
+  font-size: 18pt;
+  font-weight: 900;
+  color: #1E3A8A;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-top: 3pt solid #1E3A8A;
+  border-bottom: 3pt solid #1E3A8A;
+  padding: 10pt 0;
+  width: 80%;
+  margin: 0 auto 16pt;
+}
+.capa-subtitulo {
+  font-size: 12pt;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 28pt;
+}
+.capa-meta table {
+  margin: 0 auto;
+  border-collapse: collapse;
+  font-size: 10pt;
+}
+.capa-meta td {
+  padding: 4pt 12pt;
+  border: 0.5pt solid #999;
+  text-align: left;
+}
+.capa-meta td:first-child {
+  font-weight: 700;
+  color: #fff;
+  background: #1a3a6b;
+}
+
+/* ── Seções ── */
+.secao {
+  margin-bottom: 18pt;
+}
+.secao-titulo {
+  font-size: 11.5pt;
+  font-weight: 700;
+  color: #1a3a6b;
+  border-bottom: 2pt solid #1a3a6b;
+  padding-bottom: 3pt;
+  margin-bottom: 10pt;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.secao-num {
+  display: inline-block;
+  background: #1E3A8A;
+  color: #fff;
+  padding: 0 5pt;
+  border-radius: 2pt;
+  margin-right: 6pt;
+  font-size: 10pt;
+}
+
+/* ── Campos ── */
+.campo-linha {
+  display: flex;
+  gap: 8pt;
+  margin-bottom: 5pt;
+  font-size: 10pt;
+}
+.campo-label {
+  font-weight: 700;
+  color: #374151;
+  white-space: nowrap;
+  min-width: 150pt;
+}
+.campo-valor {
+  color: #111;
+  flex: 1;
+  border-bottom: 0.5pt dotted #aaa;
+}
+
+/* ── Equipamento ── */
+.equip-box {
+  border: 1pt solid #1E3A8A;
+  border-radius: 4pt;
+  padding: 10pt 14pt;
+  margin-bottom: 12pt;
+  background: #f8faff;
+}
+.equip-box h3 {
+  font-size: 10pt;
+  font-weight: 700;
+  color: #1E3A8A;
+  text-transform: uppercase;
+  margin-bottom: 6pt;
+}
+.equip-dim {
+  display: flex;
+  gap: 24pt;
+  font-size: 10pt;
+  margin-top: 6pt;
+}
+.equip-dim span { font-weight: 700; }
+
+/* ── Fotos ── */
+.fotos-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12pt;
+  margin: 8pt 0;
+}
+.foto-box { text-align: center; }
+.foto-placeholder {
+  width: 100%;
+  height: 120pt;
+  background: #f3f4f6;
+  border: 1pt dashed #aaa;
+  border-radius: 4pt;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 11pt;
+  color: #9ca3af;
+}
+.foto-legenda {
+  font-size: 8.5pt;
+  font-style: italic;
+  color: #555;
+  margin-top: 4pt;
+  text-align: center;
+}
+
+/* ── Garantia ── */
+.garantia-box {
+  background: #fff8f0;
+  border-left: 3pt solid #f59e0b;
+  padding: 10pt 14pt;
+  margin-bottom: 10pt;
+  font-size: 10.5pt;
+  line-height: 1.6;
+}
+
+/* ── Tabela de contatos ── */
+.tabela-contatos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+  margin-top: 8pt;
+}
+.tabela-contatos th {
+  background: #1E3A8A;
+  color: #fff;
+  padding: 5pt 8pt;
+  text-align: left;
+  font-size: 9pt;
+}
+.tabela-contatos td {
+  padding: 5pt 8pt;
+  border-bottom: 0.5pt solid #e5e7eb;
+}
+
+/* ── Referência Proposta / Pedido ── */
+.ref-box {
+  border: 1pt solid #e5e7eb;
+  border-radius: 4pt;
+  padding: 12pt 16pt;
+  background: #fafafa;
+  font-size: 10pt;
+  line-height: 1.8;
+}
+
+/* ── Misc ── */
+.texto-justificado {
+  text-align: justify;
+  line-height: 1.6;
+  font-size: 10.5pt;
+}
+.page-break { page-break-after: always; }
+.page-break-inside-avoid { page-break-inside: avoid; }
+
+@media print {
+  .doc-header, .doc-footer { display: block !important; }
+}
+</style>
+</head>
+<body>
+
+<div style="position:fixed;left:0;top:0;bottom:0;width:8px;background:#1a3a6b;z-index:300;print-color-adjust:exact;-webkit-print-color-adjust:exact;"></div>
+
+<!-- Cabeçalho fixo -->
+<div class="doc-header">
+  <table class="header-table">
+    <tr>
+      <td class="logo-cell" rowspan="2">
+        <img src="http://localhost:5173/src/assets/logo.jpeg" alt="Logo" />
+      </td>
+      <td class="doc-title-cell" rowspan="2">
+        RELATÓRIO TÉCNICO DE EXECUÇÃO
+      </td>
+      <td style="font-size:8.5pt;font-weight:700;">Nº RTE-0019.12.25 REV00</td>
+    </tr>
+    <tr>
+      <td style="font-size:8.5pt;">Data: 20/06/2026</td>
+    </tr>
+  </table>
+</div>
+
+<!-- Rodapé fixo -->
+<div class="doc-footer">
+  <span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span>
+  <span>Página</span>
+</div>
+
+<div class="content">
+
+  <!-- 1. CAPA -->
+  <div class="capa">
+    <div class="capa-banner">
+      <img src="http://localhost:5173/src/assets/logo.jpeg" alt="Logo" />
+      <div class="capa-banner-nome">Engeplar Indústria e Comércio Ltda</div>
+    </div>
+    <div class="capa-titulo">Relatório Técnico de Execução</div>
+    <div class="capa-subtitulo">Tratamento e Pintura Anticorrosiva</div>
+    <div class="capa-meta">
+      <table>
+        <tr><td>Nº RTE</td><td>RTE-0019.12.25 REV00</td></tr>
+        <tr><td>Contratante</td><td>BRF — Tanque TQ-01</td></tr>
+        <tr><td>Local</td><td>Rua das Indústrias, 100 — Tatuí/SP</td></tr>
+        <tr><td>PTC Referência</td><td>PTC-0012.11.25</td></tr>
+        <tr><td>Período</td><td>10/11/2025 a 16/11/2025</td></tr>
+        <tr><td>Data de Emissão</td><td>20/06/2026</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 2. AGRADECIMENTOS -->
+  
+    <div class="secao page-break-inside-avoid">
+      <h2 class="secao-titulo"><span class="secao-num">2.</span> Agradecimentos</h2>
+      
+    <p class="texto-justificado" style="margin-bottom:10pt;">
+      A <strong>Engeplar</strong> agradece a confiança depositada e a oportunidade de
+      realizar os serviços descritos neste relatório. Expressamos nossa gratidão aos responsáveis
+      do contratante pelo acompanhamento e suporte durante toda a execução.
+    </p>
+    
+    <table class="tabela-contatos" style="max-width:420pt;">
+      <thead>
+        <tr><th>Responsável Contratante</th><th>Empresa / Unidade</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Carlos Silva</td>
+          <td>BRF — Tanque TQ-01</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+  <!-- 3. INTRODUÇÃO -->
+  
+    <div class="secao page-break-inside-avoid">
+      <h2 class="secao-titulo"><span class="secao-num">3.</span> Introdução</h2>
+      
+    <p class="texto-justificado" style="margin-bottom:12pt;">
+      O presente documento tem por finalidade apresentar os dados capturados na execução dos
+      trabalhos de <strong>Tratamento anticorrosivo interno e externo do tanque TQ-01.</strong>.
+    </p>
+    <p class="texto-justificado" style="margin-bottom:12pt;">
+      A execução do trabalho apontado ocorreu em <strong>Rua das Indústrias, 100 — Tatuí/SP</strong>.
+      As atividades foram acompanhadas pelo(a) Sr(a). <strong>Carlos Silva</strong>.
+    </p>
+    <div style="margin-top:8pt;">
+      
+    <div class="campo-linha">
+      <span class="campo-label">Proposta Técnica Comercial:</span>
+      <span class="campo-valor">PTC-0012.11.25</span>
+    </div>
+      
+    <div class="campo-linha">
+      <span class="campo-label">Pedido Nº:</span>
+      <span class="campo-valor">PED-2025-001</span>
+    </div>
+      
+    <div class="campo-linha">
+      <span class="campo-label">ART Nº:</span>
+      <span class="campo-valor">ART-2025-001</span>
+    </div>
+      
+    <div class="campo-linha">
+      <span class="campo-label">Nota Fiscal Nº:</span>
+      <span class="campo-valor">NF-001234</span>
+    </div>
+      
+    <div class="campo-linha">
+      <span class="campo-label">Técnico Responsável:</span>
+      <span class="campo-valor">João Peiker — Técnico de Revestimento</span>
+    </div>
+    </div>
+    </div>
+
+  <!-- 4. DESCRIÇÃO DA ATIVIDADE -->
+  
+    <div class="secao page-break-inside-avoid">
+      <h2 class="secao-titulo"><span class="secao-num">4.</span> Descrição da Atividade</h2>
+      
+    <p class="texto-justificado" style="margin-bottom:12pt;">
+      Tratamento anticorrosivo interno e externo do tanque TQ-01.
+    </p>
+    
+    <div class="equip-box">
+      <h3>Dados do Equipamento</h3>
+      
+    <div class="campo-linha">
+      <span class="campo-label">Estrutura:</span>
+      <span class="campo-valor"></span>
+    </div>
+      
+    <div class="campo-linha">
+      <span class="campo-label">Identificação:</span>
+      <span class="campo-valor">BRF — Tanque TQ-01</span>
+    </div>
+      
+    <div class="campo-linha">
+      <span class="campo-label">Localização:</span>
+      <span class="campo-valor">Rua das Indústrias, 100 — Tatuí/SP</span>
+    </div>
+      
+      <div class="equip-dim">
+        <div>Diâmetro: <span>3,2 m</span></div>
+        <div>Altura: <span>4,5 m</span></div>
+        <div>Área: <span>45 m² m²</span></div>
+      </div>
+    </div>
+    <div style="margin-top:12pt;">
+          <table style="width:100%;border-collapse:collapse;margin-top:6pt;"><tr><td style="font-weight:700;color:#374151;padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;white-space:nowrap;font-size:10pt;">Produto / Sistema</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Eposeal 300</td></tr><tr><td style="font-weight:700;color:#374151;padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;white-space:nowrap;font-size:10pt;">Fabricante</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Sika</td></tr><tr><td style="font-weight:700;color:#374151;padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;white-space:nowrap;font-size:10pt;">Preparo de Superfície</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Sa 2,5</td></tr><tr><td style="font-weight:700;color:#374151;padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;white-space:nowrap;font-size:10pt;">Sistema de Aplicação</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Airless</td></tr></table>
+          
+          <p style="font-weight:700;font-size:10pt;margin:10pt 0 4pt;color:#1E3A8A;">Esquema de Pintura</p>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="background:#1E3A8A;color:#fff;">
+              <th style="padding:4pt 8pt;font-size:9pt;text-align:left;">Camada</th>
+              <th style="padding:4pt 8pt;font-size:9pt;text-align:left;">Material</th>
+              <th style="padding:4pt 8pt;font-size:9pt;text-align:left;">Cor</th>
+              <th style="padding:4pt 8pt;font-size:9pt;">Esp. Úmida</th>
+              <th style="padding:4pt 8pt;font-size:9pt;">Esp. Seca</th>
+            </tr></thead>
+            <tbody>
+          <tr>
+            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;font-weight:600;">Camada 1</td>
+            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Primer epóxi</td>
+            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Cinza</td>
+            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;">125 µm úmida</td>
+            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;">75 µm seca</td>
+          </tr>
+          <tr>
+            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;font-weight:600;">Camada 2</td>
+            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Eposeal 300</td>
+            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">RAL 7035</td>
+            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;">250 µm úmida</td>
+            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;">150 µm seca</td>
+          </tr></tbody>
+          </table>
+          <p style="font-size:10pt;font-weight:700;margin-top:6pt;">Espessura Total Seca: <span style="color:#1E3A8A;">225 µm</span></p></div>
+    </div>
+
+  <!-- 5. ESTRUTURA (fotos antes da intervenção) -->
+  
+    <div class="secao page-break-inside-avoid">
+      <h2 class="secao-titulo"><span class="secao-num">5.</span> Estrutura — Condição Anterior à Intervenção</h2>
+      
+    <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
+      Registro fotográfico das condições do equipamento antes do início dos serviços.
+    </p>
+    <div class="fotos-grid">
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto EST 1</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 1</p>
+        </div>
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto EST 2</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 2</p>
+        </div>
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto EST 3</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 3</p>
+        </div>
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto EST 4</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 4</p>
+        </div></div>
+    </div>
+
+  <!-- 6. PROCEDIMENTO (fotos de execução) -->
+  
+    <div class="secao page-break-inside-avoid">
+      <h2 class="secao-titulo"><span class="secao-num">6.</span> Procedimento — Etapas de Execução</h2>
+      
+    <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
+      Registro fotográfico das etapas de execução dos serviços.
+    </p>
+    
+        <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">1. Preparação de Superfície</p>
+        <div class="fotos-grid">
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto PROC-1 1</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 1</p>
+        </div>
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto PROC-1 2</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 2</p>
+        </div></div>
+      
+        <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">2. Aplicação do Primer</p>
+        <div class="fotos-grid">
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto PROC-2 1</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 1</p>
+        </div>
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto PROC-2 2</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 2</p>
+        </div></div>
+      
+        <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">3. Aplicação da Camada Final</p>
+        <div class="fotos-grid">
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto PROC-3 1</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 1</p>
+        </div>
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto PROC-3 2</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 2</p>
+        </div></div>
+      
+    </div>
+
+  <!-- 7. ENSAIOS / TESTES -->
+  
+    <div class="secao page-break-inside-avoid">
+      <h2 class="secao-titulo"><span class="secao-num">7.</span> Ensaios e Testes</h2>
+      
+    <div style="margin-bottom:12pt;"><p style="margin-bottom:8pt;font-size:10.5pt;">Leitura de espessura de película seca por ultrassom — conforme ficha técnica do fabricante.</p>
+          <table style="width:100%;border-collapse:collapse;max-width:360pt;">
+            <thead><tr style="background:#1E3A8A;color:#fff;"><th style="padding:5pt 8pt;font-size:9pt;text-align:left;">Camada</th><th style="padding:5pt 8pt;font-size:9pt;text-align:right;">Espessura Seca</th></tr></thead>
+            <tbody><tr><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Camada 1 — Primer epóxi</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;font-weight:700;">75 µm</td></tr><tr><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Camada 2 — Eposeal 300</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;font-weight:700;">150 µm</td></tr></tbody>
+          </table>
+          <p style="font-size:10pt;font-weight:700;margin-top:8pt;">Total: 225 µm</p></div>
+    <div class="fotos-grid">
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto ENS 1</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 1</p>
+        </div>
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto ENS 2</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 2</p>
+        </div></div>
+    </div>
+
+  <!-- 8. GARANTIA -->
+  
+    <div class="secao page-break-inside-avoid">
+      <h2 class="secao-titulo"><span class="secao-num">8.</span> Garantia</h2>
+      
+    <div class="garantia-box">
+      <p style="margin-bottom:8pt;">
+        Nossa intervenção deve atender e garantir os requisitos de desempenho do sistema aplicado por
+        <strong>36 MESES</strong> a partir da data de emissão deste relatório.
+      </p>
+      <p>
+        Este equipamento deverá passar por inspeção periódica a cada
+        <strong>12 MESES</strong>.
+      </p>
+    </div>
+    </div>
+
+  <!-- 9. IMAGENS DO EQUIPAMENTO (pós-serviço) -->
+  
+    <div class="secao page-break-inside-avoid">
+      <h2 class="secao-titulo"><span class="secao-num">9.</span> Imagens do Equipamento — Condição Final</h2>
+      
+    <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
+      Registro fotográfico do equipamento após a conclusão dos serviços.
+    </p>
+    <div class="fotos-grid">
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto FINAL 1</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 1</p>
+        </div>
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto FINAL 2</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 2</p>
+        </div>
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto FINAL 3</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 3</p>
+        </div>
+        <div class="foto-box">
+          <div class="foto-placeholder">
+            <span>📷 Foto FINAL 4</span>
+            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
+          </div>
+          <p class="foto-legenda">Legenda da foto 4</p>
+        </div></div>
+    </div>
+
+  <!-- 10. ORDEM DE COMPRA / PEDIDO -->
+  
+    <div class="secao page-break-inside-avoid">
+      <h2 class="secao-titulo"><span class="secao-num">10.</span> Ordem de Compra / Pedido</h2>
+      
+    <div class="ref-box">
+      
+    <div class="campo-linha">
+      <span class="campo-label">Pedido Nº:</span>
+      <span class="campo-valor">PED-2025-001</span>
+    </div>
+      
+    <div class="campo-linha">
+      <span class="campo-label">Data do Pedido:</span>
+      <span class="campo-valor">___/___/______</span>
+    </div>
+      
+    <div class="campo-linha">
+      <span class="campo-label">Contratante:</span>
+      <span class="campo-valor">BRF — Tanque TQ-01</span>
+    </div>
+    </div>
+    <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
+      Cópia do documento de compra original disponível no arquivo da obra.
+    </p>
+    </div>
+
+  <!-- 11. PROPOSTA COMERCIAL -->
+  
+    <div class="secao page-break-inside-avoid">
+      <h2 class="secao-titulo"><span class="secao-num">11.</span> Proposta Técnica Comercial</h2>
+      
+    <div class="ref-box">
+      
+    <div class="campo-linha">
+      <span class="campo-label">PTC Nº:</span>
+      <span class="campo-valor">PTC-0012.11.25</span>
+    </div>
+      
+    <div class="campo-linha">
+      <span class="campo-label">Descrição:</span>
+      <span class="campo-valor">PTC-2025-001</span>
+    </div>
+    </div>
+    <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
+      Proposta técnica comercial conforme arquivo aprovado pelo contratante.
+    </p>
+    </div>
+
+  <!-- 12. CONTATOS E CORPO TÉCNICO -->
+  
+    <div class="secao page-break-inside-avoid">
+      <h2 class="secao-titulo"><span class="secao-num">12.</span> Contatos e Corpo Técnico</h2>
+      
+    <table class="tabela-contatos">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Cargo</th>
+          <th>E-mail</th>
+          <th>Telefone</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>John Clovis Peiker</td>
+          <td>Diretor Técnico</td>
+          <td>john@engeplar.com.br</td>
+          <td>(47) 9 8815-3943</td>
+        </tr>
+        <tr>
+          <td>Edson James Peiker</td>
+          <td>Diretor</td>
+          <td>james@engeplar.com.br</td>
+          <td>(47) 9 8829-3476</td>
+        </tr>
+        <tr>
+          <td>Matheus Peiker</td>
+          <td>Gerente de Fábrica</td>
+          <td>matheus@engeplar.com.br</td>
+          <td>(47) 9 9637-0326</td>
+        </tr>
+        
+        <tr>
+          <td>João Peiker</td>
+          <td>Técnico de Revestimento</td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
+
+    </div>
+
+</div>
+
+<script>window.onload = () => window.print();</script>
+</body>
+</html>

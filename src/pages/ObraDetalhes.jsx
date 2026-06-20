@@ -6,6 +6,7 @@ import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 import { gerarHTMLRTE } from '../templates/rteTemplate';
 import { gerarPTC } from '../lib/gerarPTC';
+import logoAsset from '../assets/logo.jpeg';
 
 // Componentes fora do render para evitar remount e perda de foco nos inputs
 const RteRow = ({ children }) => (
@@ -60,6 +61,11 @@ export default function ObraDetalhes() {
     funcionarios, updateFuncionario,
     formatCurrency, empresa
   } = useAppContext();
+
+  const logoUrl = empresa.logo
+    ? (empresa.logo.startsWith('http') ? empresa.logo : `${window.location.origin}${empresa.logo}`)
+    : logoAsset;
+  const empresaComLogo = { ...empresa, logo: logoUrl };
 
   const obra = obras.find(o => o.id === id);
   const [aba, setAba] = useState('resumo');
@@ -461,7 +467,7 @@ export default function ObraDetalhes() {
                     <button className="btn btn-secondary btn-sm" onClick={exportarPropostaDaObraPDF}>
                       <Download size={14} /> Exportar PDF
                     </button>
-                    <button className="btn btn-primary btn-sm" onClick={() => gerarPTC(propostaPrincipal, obra, null, orcamento, orcItens, empresa)}>
+                    <button className="btn btn-primary btn-sm" onClick={() => gerarPTC(propostaPrincipal, obra, null, orcamento, orcItens, empresaComLogo)}>
                       <FileText size={14} /> Exportar PTC
                     </button>
                   </div>
@@ -1155,7 +1161,7 @@ export default function ObraDetalhes() {
         };
 
         const gerarRTE = () => {
-          const html = gerarHTMLRTE(obra, empresa, cronograma, propostaPrincipal, equipeObra);
+          const html = gerarHTMLRTE(obra, empresaComLogo, cronograma, propostaPrincipal, equipeObra);
           const w = window.open('', '_blank');
           if (w) { w.document.write(html); w.document.close(); }
         };
