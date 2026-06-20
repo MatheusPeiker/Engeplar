@@ -70,26 +70,68 @@ body {
   padding: 2px 6px;
 }
 
-/* ── Página + Rodapé inline ── */
+/* ── Página ── */
 .pagina {
-  min-height: calc(297mm - 85px - 40px);
-  display: flex;
-  flex-direction: column;
   page-break-after: always;
 }
+
+/* ── Rodapé fixo ── */
 .doc-footer {
-  border-top: 2px solid #1a3a6b;
-  color: #1a3a6b;
-  font-size: 8pt;
-  padding: 5px 40px;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 200;
+  padding: 0 40px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.footer-id-line {
   display: flex;
   justify-content: space-between;
+  padding: 2px 0;
+  font-size: 8pt;
+  color: #444;
+  border-top: 0.5pt solid #888;
+}
+.footer-bar {
+  background: #1a3a6b;
+  color: #fff;
+  display: flex;
   align-items: center;
-  margin-top: auto;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font-size: 8.5pt;
+}
+.footer-bar .footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.footer-bar .footer-brand img {
+  height: 20px;
+  filter: brightness(0) invert(1);
+}
+.footer-bar .footer-contacts {
+  display: flex;
+  gap: 16px;
+}
+
+/* ── Watermark ── */
+.watermark {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 360px;
+  height: 360px;
+  object-fit: contain;
+  opacity: 0.05;
+  z-index: 0;
+  pointer-events: none;
 }
 
 /* ── Conteúdo ── */
-.content { margin-top: 0; }
+.doc-content { position: relative; z-index: 1; }
 
 /* ── Capa ── */
 .capa {
@@ -342,7 +384,28 @@ body {
   </table>
 </div>
 
-<div class="content">
+<img class="watermark" src="http://localhost:5173/src/assets/logo.jpeg" alt="" />
+
+<!-- Rodapé fixo (repete em todas as páginas) -->
+<div class="doc-footer">
+  <div class="footer-id-line">
+    <span>RTE-0019.12.25 REV00</span>
+    <span>Engeplar</span>
+  </div>
+  <div class="footer-bar">
+    <div class="footer-brand">
+      <img src="http://localhost:5173/src/assets/logo.jpeg" alt="" />
+      <span>Engeplar</span>
+    </div>
+    <div class="footer-contacts">
+      <span>&#9990; (47) 3386-0000</span>
+      <span>&#9993; contato@engeplar.com.br</span>
+      <span>&#127760; www.engeplar.com.br</span>
+    </div>
+  </div>
+</div>
+
+<div class="doc-content">
 
   <!-- PÁGINA 1 — CAPA -->
   <div class="pagina">
@@ -364,13 +427,11 @@ body {
         </table>
       </div>
     </div>
-    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 1</span></div>
   </div>
 
   <!-- PÁGINA 2 — AGRADECIMENTOS + INTRODUÇÃO -->
   <div class="pagina">
-    <div style="flex:1">
-      
+    
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">2.</span> Agradecimentos</h2>
       
@@ -427,14 +488,11 @@ body {
     </div>
         </div>
     </div>
-    </div>
-    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 2</span></div>
   </div>
 
   <!-- PÁGINA 3 — DESCRIÇÃO DA ATIVIDADE -->
   <div class="pagina">
-    <div style="flex:1">
-      
+    
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">4.</span> Descrição da Atividade</h2>
       
@@ -496,21 +554,18 @@ body {
           </table>
           <p style="font-size:10pt;font-weight:700;margin-top:6pt;">Espessura Total Seca: <span style="color:#1E3A8A;">225 µm</span></p></div>
     </div>
-    </div>
-    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 3</span></div>
   </div>
 
   <!-- PÁGINA 4 — ESTRUTURA (condição anterior) -->
   <div class="pagina">
-    <div style="flex:1">
-      
+    
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">5.</span> Estrutura — Condição Anterior à Intervenção</h2>
       
-        <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
-          Registro fotográfico das condições do equipamento antes do início dos serviços.
-        </p>
-        <div class="fotos-grid">
+      <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
+        Registro fotográfico das condições do equipamento antes do início dos serviços.
+      </p>
+      <div class="fotos-grid">
         <div class="foto-box">
           <div class="foto-placeholder">
             <span>📷 Foto EST 1</span>
@@ -540,14 +595,11 @@ body {
           <p class="foto-legenda">Legenda da foto 4</p>
         </div></div>
     </div>
-    </div>
-    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 4</span></div>
   </div>
 
   <!-- PÁGINA 5 — PROCEDIMENTO -->
   <div class="pagina">
-    <div style="flex:1">
-      
+    
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">6.</span> Procedimento — Etapas de Execução</h2>
       
@@ -604,24 +656,21 @@ body {
           <p class="foto-legenda">Legenda da foto 2</p>
         </div></div>
     </div>
-    </div>
-    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 5</span></div>
   </div>
 
   <!-- PÁGINA 6 — ENSAIOS + GARANTIA -->
   <div class="pagina">
-    <div style="flex:1">
-      
+    
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">7.</span> Ensaios e Testes</h2>
       
-        <div style="margin-bottom:12pt;"><p style="margin-bottom:8pt;font-size:10.5pt;">Leitura de espessura de película seca por ultrassom — conforme ficha técnica do fabricante.</p>
+      <div style="margin-bottom:12pt;"><p style="margin-bottom:8pt;font-size:10.5pt;">Leitura de espessura de película seca por ultrassom — conforme ficha técnica do fabricante.</p>
           <table style="width:100%;border-collapse:collapse;max-width:360pt;">
             <thead><tr style="background:#1E3A8A;color:#fff;"><th style="padding:5pt 8pt;font-size:9pt;text-align:left;">Camada</th><th style="padding:5pt 8pt;font-size:9pt;text-align:right;">Espessura Seca</th></tr></thead>
             <tbody><tr><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Camada 1 — Primer epóxi</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;font-weight:700;">75 µm</td></tr><tr><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Camada 2 — Eposeal 300</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;font-weight:700;">150 µm</td></tr></tbody>
           </table>
           <p style="font-size:10pt;font-weight:700;margin-top:8pt;">Total: 225 µm</p></div>
-        <div class="fotos-grid">
+      <div class="fotos-grid">
         <div class="foto-box">
           <div class="foto-placeholder">
             <span>📷 Foto ENS 1</span>
@@ -637,26 +686,23 @@ body {
           <p class="foto-legenda">Legenda da foto 2</p>
         </div></div>
     </div>
-      
+    
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">8.</span> Garantia</h2>
       
-        <div class="garantia-box">
-          <p style="margin-bottom:8pt;">
-            Nossa intervenção deve atender e garantir os requisitos de desempenho do sistema aplicado por
-            <strong>36 MESES</strong> a partir da data de emissão deste relatório.
-          </p>
-          <p>Este equipamento deverá passar por inspeção periódica a cada <strong>12 MESES</strong>.</p>
-        </div>
+      <div class="garantia-box">
+        <p style="margin-bottom:8pt;">
+          Nossa intervenção deve atender e garantir os requisitos de desempenho do sistema aplicado por
+          <strong>36 MESES</strong> a partir da data de emissão deste relatório.
+        </p>
+        <p>Este equipamento deverá passar por inspeção periódica a cada <strong>12 MESES</strong>.</p>
+      </div>
     </div>
-    </div>
-    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 6</span></div>
   </div>
 
   <!-- PÁGINA 7 — IMAGENS FINAL + PEDIDO + PROPOSTA + CONTATOS -->
   <div class="pagina">
-    <div style="flex:1">
-      
+    
     <div class="secao page-break-inside-avoid">
       <h2 class="secao-titulo"><span class="secao-num">9.</span> Imagens do Equipamento — Condição Final</h2>
       
@@ -755,8 +801,6 @@ body {
           </tbody>
         </table>
     </div>
-    </div>
-    <div class="doc-footer"><span>Engeplar · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · contato@engeplar.com.br</span><span>Página 7</span></div>
   </div>
 
 </div>

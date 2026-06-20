@@ -193,7 +193,6 @@ export function gerarHTMLRTE(obra, empresa, cronograma = [], proposta = null, te
       <span class="campo-valor">${valor}</span>
     </div>`;
 
-  const rodape = (n) => `<div class="doc-footer"><span>${nomeEmpresa} · ${esc(empresa?.endereco || 'Rua Amazonas, 475 — Rio dos Cedros/SC')} · ${esc(empresa?.telefone || '(47) 3386-0000')} · ${esc(empresa?.email || 'contato@engeplar.com.br')}</span><span>Página ${n}</span></div>`;
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -267,26 +266,68 @@ body {
   padding: 2px 6px;
 }
 
-/* ── Página + Rodapé inline ── */
+/* ── Página ── */
 .pagina {
-  min-height: calc(297mm - 85px - 40px);
-  display: flex;
-  flex-direction: column;
   page-break-after: always;
 }
+
+/* ── Rodapé fixo ── */
 .doc-footer {
-  border-top: 2px solid #1a3a6b;
-  color: #1a3a6b;
-  font-size: 8pt;
-  padding: 5px 40px;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 200;
+  padding: 0 40px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.footer-id-line {
   display: flex;
   justify-content: space-between;
+  padding: 2px 0;
+  font-size: 8pt;
+  color: #444;
+  border-top: 0.5pt solid #888;
+}
+.footer-bar {
+  background: #1a3a6b;
+  color: #fff;
+  display: flex;
   align-items: center;
-  margin-top: auto;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font-size: 8.5pt;
+}
+.footer-bar .footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.footer-bar .footer-brand img {
+  height: 20px;
+  filter: brightness(0) invert(1);
+}
+.footer-bar .footer-contacts {
+  display: flex;
+  gap: 16px;
+}
+
+/* ── Watermark ── */
+.watermark {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 360px;
+  height: 360px;
+  object-fit: contain;
+  opacity: 0.05;
+  z-index: 0;
+  pointer-events: none;
 }
 
 /* ── Conteúdo ── */
-.content { margin-top: 0; }
+.doc-content { position: relative; z-index: 1; }
 
 /* ── Capa ── */
 .capa {
@@ -541,7 +582,28 @@ body {
   </table>
 </div>
 
-<div class="content">
+${empresa?.logo ? `<img class="watermark" src="${esc(empresa.logo)}" alt="" />` : ''}
+
+<!-- Rodapé fixo (repete em todas as páginas) -->
+<div class="doc-footer">
+  <div class="footer-id-line">
+    <span>${rteNum}</span>
+    <span>${nomeEmpresa}</span>
+  </div>
+  <div class="footer-bar">
+    <div class="footer-brand">
+      ${empresa?.logo ? `<img src="${esc(empresa.logo)}" alt="" />` : ''}
+      <span>${nomeEmpresa}</span>
+    </div>
+    <div class="footer-contacts">
+      <span>&#9990; ${esc(empresa?.telefone || '(47) 3386-0000')}</span>
+      <span>&#9993; ${esc(empresa?.email || 'contato@engeplar.com.br')}</span>
+      ${empresa?.site ? `<span>&#127760; ${esc(empresa.site)}</span>` : ''}
+    </div>
+  </div>
+</div>
+
+<div class="doc-content">
 
   <!-- PÁGINA 1 — CAPA -->
   <div class="pagina">
@@ -563,13 +625,11 @@ body {
         </table>
       </div>
     </div>
-    ${rodape(1)}
   </div>
 
   <!-- PÁGINA 2 — AGRADECIMENTOS + INTRODUÇÃO -->
   <div class="pagina">
-    <div style="flex:1">
-      ${secao(2, 'Agradecimentos', `
+    ${secao(2, 'Agradecimentos', `
         <p class="texto-justificado" style="margin-bottom:10pt;">
           A <strong>${nomeEmpresa}</strong> agradece a confiança depositada e a oportunidade de
           realizar os serviços descritos neste relatório. Expressamos nossa gratidão aos responsáveis
@@ -598,14 +658,11 @@ body {
           ${campo('Nota Fiscal Nº', esc(obra.nfNumero || '___________') + (obra.nfData ? `&nbsp;&nbsp;&nbsp;Data: ${fmt(obra.nfData)}` : ''))}
           ${tecnicoNome ? campo('Técnico Responsável', `${tecnicoNome}${tecnicoCargo ? ' — ' + tecnicoCargo : ''}`) : ''}
         </div>`)}
-    </div>
-    ${rodape(2)}
   </div>
 
   <!-- PÁGINA 3 — DESCRIÇÃO DA ATIVIDADE -->
   <div class="pagina">
-    <div style="flex:1">
-      ${secao(4, 'Descrição da Atividade', `
+    ${secao(4, 'Descrição da Atividade', `
         <p class="texto-justificado" style="margin-bottom:12pt;">
           ${esc(obra.descricaoTecnica || `Execução de serviços de ${tipoLabel || 'intervenção técnica'} conforme Proposta Técnica Comercial ${ptcRef}.`)}
         </p>
@@ -623,26 +680,20 @@ body {
           </div>` : ''}
         </div>` : ''}
         ${blocoTecnico ? `<div style="margin-top:12pt;">${blocoTecnico}</div>` : ''}`)}
-    </div>
-    ${rodape(3)}
   </div>
 
   <!-- PÁGINA 4 — ESTRUTURA (condição anterior) -->
   <div class="pagina">
-    <div style="flex:1">
-      ${secao(5, 'Estrutura — Condição Anterior à Intervenção', `
-        <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
-          Registro fotográfico das condições do equipamento antes do início dos serviços.
-        </p>
-        ${fotoPlaceholder('EST', 4)}`)}
-    </div>
-    ${rodape(4)}
+    ${secao(5, 'Estrutura — Condição Anterior à Intervenção', `
+      <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
+        Registro fotográfico das condições do equipamento antes do início dos serviços.
+      </p>
+      ${fotoPlaceholder('EST', 4)}`)}
   </div>
 
   <!-- PÁGINA 5 — PROCEDIMENTO -->
   <div class="pagina">
-    <div style="flex:1">
-      ${secao(6, 'Procedimento — Etapas de Execução', `
+    ${secao(6, 'Procedimento — Etapas de Execução', `
         <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
           Registro fotográfico das etapas de execução dos serviços.
         </p>
@@ -651,32 +702,26 @@ body {
             <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">${i + 1}. ${esc(e.etapa)}</p>
             ${fotoPlaceholder('PROC-' + (i + 1), 2)}`).join('')
           : fotoPlaceholder('PROC', 4)}`)}
-    </div>
-    ${rodape(5)}
   </div>
 
   <!-- PÁGINA 6 — ENSAIOS + GARANTIA -->
   <div class="pagina">
-    <div style="flex:1">
-      ${secao(7, 'Ensaios e Testes', `
-        <div style="margin-bottom:12pt;">${blocoEnsaio}</div>
-        ${fotoPlaceholder('ENS', 2)}`)}
-      ${secao(8, 'Garantia', `
-        <div class="garantia-box">
-          <p style="margin-bottom:8pt;">
-            Nossa intervenção deve atender e garantir os requisitos de desempenho do sistema aplicado por
-            <strong>${obra.garantiaMeses || 36} MESES</strong> a partir da data de emissão deste relatório.
-          </p>
-          <p>Este equipamento deverá passar por inspeção periódica a cada <strong>${obra.inspecaoMeses || 12} MESES</strong>.</p>
-        </div>`)}
-    </div>
-    ${rodape(6)}
+    ${secao(7, 'Ensaios e Testes', `
+      <div style="margin-bottom:12pt;">${blocoEnsaio}</div>
+      ${fotoPlaceholder('ENS', 2)}`)}
+    ${secao(8, 'Garantia', `
+      <div class="garantia-box">
+        <p style="margin-bottom:8pt;">
+          Nossa intervenção deve atender e garantir os requisitos de desempenho do sistema aplicado por
+          <strong>${obra.garantiaMeses || 36} MESES</strong> a partir da data de emissão deste relatório.
+        </p>
+        <p>Este equipamento deverá passar por inspeção periódica a cada <strong>${obra.inspecaoMeses || 12} MESES</strong>.</p>
+      </div>`)}
   </div>
 
   <!-- PÁGINA 7 — IMAGENS FINAL + PEDIDO + PROPOSTA + CONTATOS -->
   <div class="pagina">
-    <div style="flex:1">
-      ${secao(9, 'Imagens do Equipamento — Condição Final', `
+    ${secao(9, 'Imagens do Equipamento — Condição Final', `
         <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
           Registro fotográfico do equipamento após a conclusão dos serviços.
         </p>
@@ -711,8 +756,6 @@ body {
             <tr><td>${esc(t.nome)}</td><td>${esc(t.funcao || '')}</td><td>—</td><td>—</td></tr>` : '').join('')}
           </tbody>
         </table>`)}
-    </div>
-    ${rodape(7)}
   </div>
 
 </div>
