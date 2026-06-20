@@ -6,9 +6,14 @@ const AppContext = createContext();
 // ── Security: whitelist of allowed campo values per entityType ──
 // Prevents arbitrary column injection via reverterAlteracao
 const ALLOWED_CAMPOS = {
-  obra:        new Set(['nome', 'endereco', 'status', 'orcamento', 'previsao']),
+  obra:        new Set(['nome', 'endereco', 'status', 'orcamento', 'previsao',
+    'rteNumero', 'pedidoNumero', 'pedidoData', 'artNumero', 'artData',
+    'nfNumero', 'nfData', 'tipoServico', 'materialEquipamento', 'dimensoes',
+    'garantiaMeses', 'inspecaoMeses', 'responsavelCliente', 'descricaoTecnica', 'dadosRte']),
   gasto:       new Set(['descricao', 'valor', 'data', 'categoria']),
-  proposta:    new Set(['nome', 'clienteNome', 'clienteCnpj', 'clienteEndereco', 'margemLucro', 'impostos', 'condicoesPagamento', 'valorProposto', 'observacoes', 'obraId', 'orcamentoId', 'status']),
+  proposta:    new Set(['nome', 'clienteNome', 'clienteCnpj', 'clienteEndereco', 'margemLucro', 'impostos', 'condicoesPagamento', 'valorProposto', 'observacoes', 'obraId', 'orcamentoId', 'status',
+    'ptcNumero', 'revisao', 'elaboracao', 'visita', 'objetivo', 'prazoExecucao', 'naoIncluso',
+    'notas', 'pagamentoDias', 'validadeDias', 'frete', 'mobilizacaoObs']),
   cronograma:  new Set(['etapa', 'dataInicio', 'dataFim', 'custo', 'progresso', 'cor']),
   funcionario: new Set(['nome', 'funcao', 'custoDiaria', 'diasTrabalhados', 'obraAtualId', 'desempenho']),
   catalogo:    new Set(['nome', 'tipo', 'custo']),
@@ -29,7 +34,23 @@ const norm = {
     orcamento: r.orcamento ?? 0,
     gastosDespesas: (r.gastos_despesas ?? []).map(g => ({
       id: g.id, descricao: g.descricao, valor: g.valor ?? 0, data: g.data ?? '', categoria: g.categoria ?? ''
-    }))
+    })),
+    // Campos RTE
+    rteNumero: r.rte_numero ?? '',
+    pedidoNumero: r.pedido_numero ?? '',
+    pedidoData: r.pedido_data ?? '',
+    artNumero: r.art_numero ?? '',
+    artData: r.art_data ?? '',
+    nfNumero: r.nf_numero ?? '',
+    nfData: r.nf_data ?? '',
+    tipoServico: r.tipo_servico ?? '',
+    materialEquipamento: r.material_equipamento ?? '',
+    dimensoes: r.dimensoes ?? { diametro: '', altura: '', area: '' },
+    garantiaMeses: r.garantia_meses ?? 36,
+    inspecaoMeses: r.inspecao_meses ?? 12,
+    responsavelCliente: r.responsavel_cliente ?? '',
+    descricaoTecnica: r.descricao_tecnica ?? '',
+    dadosRte: r.dados_rte ?? {},
   }),
   funcionario: (r) => ({
     id: r.id, nome: r.nome, funcao: r.funcao,
@@ -49,7 +70,20 @@ const norm = {
     clienteNome: r.cliente_nome, clienteCnpj: r.cliente_cnpj, clienteEndereco: r.cliente_endereco,
     margemLucro: r.margem_lucro ?? 20, impostos: r.impostos ?? 6,
     condicoesPagamento: r.condicoes_pagamento, valorProposto: r.valor_proposto,
-    observacoes: r.observacoes, status: r.status || 'rascunho'
+    observacoes: r.observacoes, status: r.status || 'rascunho',
+    // Campos PTC
+    ptcNumero:      r.ptc_numero      ?? '',
+    revisao:        r.revisao         || 'REV00',
+    elaboracao:     r.elaboracao      ?? '',
+    visita:         r.visita          ?? '',
+    objetivo:       r.objetivo        ?? '',
+    prazoExecucao:  r.prazo_execucao  ?? '',
+    naoIncluso:     r.nao_incluso     ?? '',
+    notas:          r.notas           ?? '',
+    pagamentoDias:  r.pagamento_dias  ?? 14,
+    validadeDias:   r.validade_dias   ?? 15,
+    frete:          r.frete           || 'CIF',
+    mobilizacaoObs: r.mobilizacao_obs || 'A combinar',
   }),
   historico: (r) => ({
     id: r.id, modulo: r.modulo, campo: r.campo,
@@ -332,7 +366,17 @@ export const AppProvider = ({ children }) => {
       if (o.id === obraId) { registrarAlteracao('Obras', campo, o[campo], valor, obraId, obraId, 'obra'); return { ...o, [campo]: valor }; }
       return o;
     }));
-    const dbField = { previsao: 'previsao', status: 'status', nome: 'nome', endereco: 'endereco', orcamento: 'orcamento' }[campo] || campo;
+    const dbField = {
+      previsao: 'previsao', status: 'status', nome: 'nome', endereco: 'endereco', orcamento: 'orcamento',
+      rteNumero: 'rte_numero',
+      pedidoNumero: 'pedido_numero', pedidoData: 'pedido_data',
+      artNumero: 'art_numero', artData: 'art_data',
+      nfNumero: 'nf_numero', nfData: 'nf_data',
+      tipoServico: 'tipo_servico', materialEquipamento: 'material_equipamento',
+      dimensoes: 'dimensoes', garantiaMeses: 'garantia_meses', inspecaoMeses: 'inspecao_meses',
+      responsavelCliente: 'responsavel_cliente', descricaoTecnica: 'descricao_tecnica',
+      dadosRte: 'dados_rte',
+    }[campo] || campo;
     await supabase.from('obras').update({ [dbField]: valor }).eq('id', obraId).eq('user_id', uid());
   }, [registrarAlteracao]);
 
@@ -488,7 +532,11 @@ export const AppProvider = ({ children }) => {
       nome: 'nome', obraId: 'obra_id', orcamentoId: 'orcamento_id',
       clienteNome: 'cliente_nome', clienteCnpj: 'cliente_cnpj', clienteEndereco: 'cliente_endereco',
       margemLucro: 'margem_lucro', impostos: 'impostos', condicoesPagamento: 'condicoes_pagamento',
-      valorProposto: 'valor_proposto', observacoes: 'observacoes', status: 'status'
+      valorProposto: 'valor_proposto', observacoes: 'observacoes', status: 'status',
+      ptcNumero: 'ptc_numero', revisao: 'revisao', elaboracao: 'elaboracao', visita: 'visita',
+      objetivo: 'objetivo', prazoExecucao: 'prazo_execucao', naoIncluso: 'nao_incluso',
+      notas: 'notas', pagamentoDias: 'pagamento_dias', validadeDias: 'validade_dias',
+      frete: 'frete', mobilizacaoObs: 'mobilizacao_obs',
     };
     await supabase.from('propostas').update({ [dbMap[campo] || campo]: valor }).eq('id', propostaId).eq('user_id', uid());
   }, [registrarAlteracao]);
@@ -803,7 +851,11 @@ export const AppProvider = ({ children }) => {
         break;
       }
       case 'proposta': {
-        const dbMap = { clienteNome:'cliente_nome', clienteCnpj:'cliente_cnpj', clienteEndereco:'cliente_endereco', margemLucro:'margem_lucro', impostos:'impostos', condicoesPagamento:'condicoes_pagamento', valorProposto:'valor_proposto', observacoes:'observacoes', obraId:'obra_id', orcamentoId:'orcamento_id', nome:'nome', status:'status' };
+        const dbMap = { clienteNome:'cliente_nome', clienteCnpj:'cliente_cnpj', clienteEndereco:'cliente_endereco', margemLucro:'margem_lucro', impostos:'impostos', condicoesPagamento:'condicoes_pagamento', valorProposto:'valor_proposto', observacoes:'observacoes', obraId:'obra_id', orcamentoId:'orcamento_id', nome:'nome', status:'status',
+          ptcNumero:'ptc_numero', revisao:'revisao', elaboracao:'elaboracao', visita:'visita',
+          objetivo:'objetivo', prazoExecucao:'prazo_execucao', naoIncluso:'nao_incluso',
+          notas:'notas', pagamentoDias:'pagamento_dias', validadeDias:'validade_dias',
+          frete:'frete', mobilizacaoObs:'mobilizacao_obs' };
         const dbField = dbMap[alt.campo];
         if (!dbField) return;
         const tv = ['margemLucro','impostos','valorProposto'].includes(alt.campo) && !isNaN(valNum) ? valNum : val;

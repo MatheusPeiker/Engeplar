@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { ArrowLeft, Plus, Trash2, MapPin, Calendar, FileText, DollarSign, Users, UserPlus, UserMinus, CheckCircle, AlertCircle, Download, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, MapPin, Calendar, FileText, DollarSign, Users, UserPlus, UserMinus, CheckCircle, AlertCircle, Download, ExternalLink, ClipboardList } from 'lucide-react';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
+import { gerarHTMLRTE } from '../templates/rteTemplate';
+import { gerarPTC } from '../lib/gerarPTC';
 
 export default function ObraDetalhes() {
   const { id } = useParams();
@@ -15,7 +17,8 @@ export default function ObraDetalhes() {
     listaOrcamentos,
     getCronogramaObra, addEtapaCronograma, updateEtapaCronograma, deleteEtapaCronograma,
     getArquivosObra, addArquivo, deleteArquivo,
-    getPropostaObra,
+    getPropostaObra, updateProposta,
+    clientes,
     funcionarios, updateFuncionario,
     formatCurrency, empresa
   } = useAppContext();
@@ -296,8 +299,8 @@ export default function ObraDetalhes() {
 
       {/* Tabs */}
       <div className="tabs-container">
-        {['resumo', 'proposta', 'equipe', 'gastos', 'orcamento', 'cronograma', 'arquivos'].map(t => (
-          <button key={t} className={`tab-btn ${aba === t ? 'active' : ''}`} onClick={() => setAba(t)} style={{ textTransform: 'capitalize' }}>{t}</button>
+        {['resumo', 'proposta', 'equipe', 'gastos', 'orcamento', 'cronograma', 'arquivos', 'rte'].map(t => (
+          <button key={t} className={`tab-btn ${aba === t ? 'active' : ''}`} onClick={() => setAba(t)} style={{ textTransform: t === 'rte' ? 'uppercase' : 'capitalize' }}>{t}</button>
         ))}
       </div>
 
@@ -413,12 +416,15 @@ export default function ObraDetalhes() {
                       </p>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button className="btn btn-secondary btn-sm" onClick={() => navigate('/proposta')}>
                       <ExternalLink size={14} /> Abrir Proposta
                     </button>
-                    <button className="btn btn-primary btn-sm" onClick={exportarPropostaDaObraPDF}>
+                    <button className="btn btn-secondary btn-sm" onClick={exportarPropostaDaObraPDF}>
                       <Download size={14} /> Exportar PDF
+                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={() => gerarPTC(propostaPrincipal, obra, null, orcamento, orcItens, empresa)}>
+                      <FileText size={14} /> Exportar PTC
                     </button>
                   </div>
                 </div>
@@ -569,6 +575,76 @@ export default function ObraDetalhes() {
                   <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{propostaPrincipal.observacoes}</p>
                 </div>
               )}
+
+              {/* ── Dados PTC ── */}
+              {(() => {
+                const p = propostaPrincipal;
+                const fs = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, outline: 'none', background: 'var(--surface)' };
+                const ls = { display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600 };
+                const st = { fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-muted)', marginBottom: 14 };
+                const up = (campo, valor) => updateProposta(p.id, campo, valor);
+                return (
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ borderTop: '2px solid var(--border)', paddingTop: 16 }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--primary)', marginBottom: 4 }}>
+                        Dados PTC — preencha para gerar a Proposta Técnica Comercial
+                      </p>
+                    </div>
+
+                    {/* Identificação */}
+                    <div className="card">
+                      <p style={st}>Identificação</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+                        <div><label style={ls}>Nº PTC</label>
+                          <input style={fs} placeholder="PTC-0001.06.26 REV00" value={p.ptcNumero || ''} onChange={e => up('ptcNumero', e.target.value)} /></div>
+                        <div><label style={ls}>Revisão</label>
+                          <input style={fs} value={p.revisao || 'REV00'} onChange={e => up('revisao', e.target.value)} /></div>
+                        <div><label style={ls}>Elaboração</label>
+                          <input style={fs} placeholder="Nome do responsável" value={p.elaboracao || ''} onChange={e => up('elaboracao', e.target.value)} /></div>
+                        <div><label style={ls}>Visita Técnica</label>
+                          <input style={fs} placeholder="Nome / data" value={p.visita || ''} onChange={e => up('visita', e.target.value)} /></div>
+                      </div>
+                    </div>
+
+                    {/* Escopo */}
+                    <div className="card">
+                      <p style={st}>Escopo</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div><label style={ls}>1.0 Objetivo</label>
+                          <textarea style={{ ...fs, resize: 'vertical', lineHeight: 1.5 }} rows={3} value={p.objetivo || ''} onChange={e => up('objetivo', e.target.value)} /></div>
+                        <div><label style={ls}>2.0 Prazo de Execução</label>
+                          <textarea style={{ ...fs, resize: 'vertical', lineHeight: 1.5 }} rows={3} value={p.prazoExecucao || ''} onChange={e => up('prazoExecucao', e.target.value)} /></div>
+                        <div><label style={ls}>2.2 Não incluso no escopo <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(opcional)</span></label>
+                          <textarea style={{ ...fs, resize: 'vertical', lineHeight: 1.5 }} rows={2} value={p.naoIncluso || ''} onChange={e => up('naoIncluso', e.target.value)} /></div>
+                        <div><label style={ls}>4.0 Observações <span style={{ fontWeight: 400 }}>(opcional)</span></label>
+                          <textarea style={{ ...fs, resize: 'vertical', lineHeight: 1.5 }} rows={2} value={p.observacoes || ''} onChange={e => up('observacoes', e.target.value)} /></div>
+                        <div><label style={ls}>7.0 Notas <span style={{ fontWeight: 400 }}>(opcional)</span></label>
+                          <textarea style={{ ...fs, resize: 'vertical', lineHeight: 1.5 }} rows={2} value={p.notas || ''} onChange={e => up('notas', e.target.value)} /></div>
+                      </div>
+                    </div>
+
+                    {/* Condições comerciais */}
+                    <div className="card">
+                      <p style={st}>Condições Comerciais</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+                        <div><label style={ls}>Pagamento (dias)</label>
+                          <input type="number" min="1" style={fs} value={p.pagamentoDias ?? 14} onChange={e => up('pagamentoDias', parseInt(e.target.value) || 14)} /></div>
+                        <div><label style={ls}>Validade (dias)</label>
+                          <input type="number" min="1" style={fs} value={p.validadeDias ?? 15} onChange={e => up('validadeDias', parseInt(e.target.value) || 15)} /></div>
+                        <div><label style={ls}>Frete</label>
+                          <select style={fs} value={p.frete || 'CIF'} onChange={e => up('frete', e.target.value)}>
+                            <option value="CIF">CIF</option>
+                            <option value="FOB">FOB</option>
+                            <option value="A combinar">A combinar</option>
+                          </select>
+                        </div>
+                        <div><label style={ls}>Mobilização</label>
+                          <input style={fs} value={p.mobilizacaoObs || 'A combinar'} onChange={e => up('mobilizacaoObs', e.target.value)} /></div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
@@ -879,6 +955,310 @@ export default function ObraDetalhes() {
           </div>
         </div>
       )}
+
+      {/* === RTE === */}
+      {aba === 'rte' && (() => {
+        const dim = obra.dimensoes || {};
+        const TIPOS_SERVICO = [
+          { value: 'RECUPERACAO_LINER',           label: 'Recuperação de Liner Interno/Externo (PRFV)' },
+          { value: 'REVESTIMENTO_PINTURA',        label: 'Tratamento e Pintura Anticorrosiva' },
+          { value: 'REVESTIMENTO_IMPERMEABILIZANTE', label: 'Revestimento Impermeabilizante' },
+          { value: 'INJECAO_QUIMICA',             label: 'Injeção Química em Trincas/Fissuras' },
+          { value: 'SOLDA_PLASTICA',              label: 'Solda Plástica por Termofusão (PP/PRFV)' },
+          { value: 'CONSTRUCAO',                  label: 'Construção de Estrutura Nova' },
+        ];
+
+        const fieldStyle = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, outline: 'none', background: 'var(--surface)' };
+        const labelStyle = { display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600 };
+        const gridStyle = { display: 'grid', gap: 16 };
+
+        const handleDim = (key, val) => {
+          updateObra(id, 'dimensoes', { ...dim, [key]: val });
+        };
+
+        const rteData = obra.dadosRte || {};
+        const handleRteField = (key, val) => {
+          updateObra(id, 'dadosRte', { ...rteData, [key]: val });
+        };
+
+        const sectionTitleStyle = { fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-muted)', marginBottom: 16 };
+
+        const renderCamposTipo = () => {
+          if (!obra.tipoServico) return null;
+          const tipoLabel = TIPOS_SERVICO.find(t => t.value === obra.tipoServico)?.label || obra.tipoServico;
+
+          const Row = ({ children }) => (
+            <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: 0 }}>{children}</div>
+          );
+          const Field = ({ label, children }) => (
+            <div><label style={labelStyle}>{label}</label>{children}</div>
+          );
+          const inp = (key, placeholder = '') => (
+            <input style={fieldStyle} placeholder={placeholder} value={rteData[key] || ''} onChange={e => handleRteField(key, e.target.value)} />
+          );
+          const num = (key, placeholder = '') => (
+            <input type="number" style={fieldStyle} placeholder={placeholder} value={rteData[key] || ''} onChange={e => handleRteField(key, e.target.value)} />
+          );
+          const ta = (key, rows = 3) => (
+            <textarea rows={rows} style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }} value={rteData[key] || ''} onChange={e => handleRteField(key, e.target.value)} />
+          );
+          const chk = (key, label) => (
+            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!rteData[key]} onChange={e => handleRteField(key, e.target.checked)} style={{ width: 15, height: 15 }} />
+              {label}
+            </label>
+          );
+
+          switch (obra.tipoServico) {
+            case 'REVESTIMENTO_PINTURA':
+              return (
+                <div className="card">
+                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
+                  <Row>
+                    <Field label="Produto / Sistema">{inp('produto_nome')}</Field>
+                    <Field label="Fabricante">{inp('fabricante')}</Field>
+                    <Field label="Norma de Preparo de Superfície">{inp('norma_jato', 'Ex: Sa 2½ ISO 8501-1')}</Field>
+                    <Field label="Sistema de Aplicação">{inp('sistema_aplicacao', 'Airless / Broxa / Rolo')}</Field>
+                  </Row>
+                  <p style={{ ...labelStyle, marginTop: 16, marginBottom: 10 }}>Camadas de Tinta</p>
+                  {[1, 2, 3].map(n => (
+                    <div key={n} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 12, marginBottom: 8, padding: '10px 12px', background: 'var(--background)', borderRadius: 8 }}>
+                      <Field label={`Camada ${n} — Material/Produto`}>{inp(`camada_${n}_material`)}</Field>
+                      <Field label="Cor">{inp(`camada_${n}_cor`)}</Field>
+                      <Field label="Esp. Úmida (µm)">{num(`camada_${n}_esp_umida`)}</Field>
+                      <Field label="Esp. Seca (µm)">{num(`camada_${n}_esp_seca`)}</Field>
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 8, maxWidth: 220 }}>
+                    <Field label="Espessura Total Seca (µm)">{num('espessura_total')}</Field>
+                  </div>
+                </div>
+              );
+
+            case 'REVESTIMENTO_IMPERMEABILIZANTE':
+              return (
+                <div className="card">
+                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
+                  <Row>
+                    <Field label="Produto / Sistema">{inp('produto_nome')}</Field>
+                    <Field label="Fabricante">{inp('fabricante')}</Field>
+                    <Field label="Sistema de Aplicação">{inp('sistema_aplicacao', 'Airless / Broxa / Rolo')}</Field>
+                    <Field label="Espessura Interna (µm)">{num('espessura_interna')}</Field>
+                    <Field label="Espessura Externa (µm)">{num('espessura_externa')}</Field>
+                  </Row>
+                </div>
+              );
+
+            case 'RECUPERACAO_LINER':
+              return (
+                <div className="card">
+                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
+                  <Row>
+                    <Field label="Tipo de Manta">{inp('tipo_manta', 'Ex: Fibra de vidro 450 g/m²')}</Field>
+                    <Field label="Resina">{inp('resina', 'Ex: Derakane 411-350')}</Field>
+                    <Field label="Tratamento Químico">{inp('tratamento_quimico')}</Field>
+                    <Field label="Acabamento">{inp('acabamento')}</Field>
+                    <Field label="Área Total (m²)">{inp('area_total_m2')}</Field>
+                  </Row>
+                  <p style={{ ...labelStyle, marginTop: 14, marginBottom: 8 }}>Áreas Executadas</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20 }}>
+                    {[['interno', 'Liner interno'], ['externo', 'Liner externo'], ['estrutural', 'Reforço estrutural'], ['fundo', 'Fundo do equipamento']].map(([k, l]) => chk(k, l))}
+                  </div>
+                </div>
+              );
+
+            case 'INJECAO_QUIMICA':
+              return (
+                <div className="card">
+                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
+                  <Row>
+                    <Field label="Produto Injetado">{inp('produto_injetado')}</Field>
+                    <Field label="Total de Pontos de Injeção">{num('total_pontos')}</Field>
+                    <Field label="Área Recuperada (m²)">{inp('area_recuperada_m2')}</Field>
+                  </Row>
+                  <div style={{ marginTop: 8 }}>
+                    <Field label="Descrição das Áreas Recuperadas">{ta('descricao_areas', 3)}</Field>
+                  </div>
+                </div>
+              );
+
+            case 'SOLDA_PLASTICA':
+              return (
+                <div className="card">
+                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
+                  <Row>
+                    <Field label="Material Base">{inp('material_base', 'PP, PRFV, PEAD...')}</Field>
+                    <Field label="Tipo de Solda">{inp('tipo_solda', 'Termofusão, Extrusão...')}</Field>
+                    <Field label="Área Reparada (m²)">{inp('area_reparada_m2')}</Field>
+                  </Row>
+                  <div style={{ marginTop: 8 }}>
+                    <Field label="Descrição dos Reparos">{ta('descricao', 3)}</Field>
+                  </div>
+                </div>
+              );
+
+            case 'CONSTRUCAO':
+              return (
+                <div className="card">
+                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
+                  <Row>
+                    <Field label="Material">{inp('material')}</Field>
+                    <Field label="Norma Aplicável">{inp('norma', 'NBR XXXX')}</Field>
+                  </Row>
+                  <div style={{ marginTop: 8 }}>
+                    <Field label="Descrição da Estrutura">{ta('descricao_estrutura', 3)}</Field>
+                  </div>
+                </div>
+              );
+
+            default:
+              return null;
+          }
+        };
+
+        const gerarRTE = () => {
+          const html = gerarHTMLRTE(obra, empresa, cronograma, propostaPrincipal, equipeObra);
+          const w = window.open('', '_blank');
+          if (w) { w.document.write(html); w.document.close(); }
+        };
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* Gerar RTE */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontWeight: 700, fontSize: 16 }}>RTE — Relatório Técnico de Execução</h3>
+                <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>Preencha os campos abaixo e clique em Gerar RTE para exportar o PDF.</p>
+              </div>
+              <button className="btn btn-primary" onClick={gerarRTE} style={{ whiteSpace: 'nowrap' }}>
+                <ClipboardList size={15} /> Gerar RTE (PDF)
+              </button>
+            </div>
+
+            {/* Bloco: Identificação */}
+            <div className="card">
+              <p style={sectionTitleStyle}>Identificação do Documento</p>
+              <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                <div>
+                  <label style={labelStyle}>Nº RTE</label>
+                  <input
+                    style={fieldStyle} placeholder="RTE-0000.MM.AA REV00"
+                    value={obra.rteNumero || ''}
+                    onChange={e => updateObra(id, 'rteNumero', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Tipo de Serviço</label>
+                  <select
+                    style={fieldStyle}
+                    value={obra.tipoServico || ''}
+                    onChange={e => updateObra(id, 'tipoServico', e.target.value)}
+                  >
+                    <option value="">— Selecionar —</option>
+                    {TIPOS_SERVICO.map(t => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Dados técnicos dinâmicos por tipo de serviço */}
+            {renderCamposTipo()}
+
+            {/* Bloco: Dados Fiscais */}
+            <div className="card">
+              <p style={sectionTitleStyle}>Dados Fiscais</p>
+              <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+                <div>
+                  <label style={labelStyle}>Pedido Nº</label>
+                  <input style={fieldStyle} value={obra.pedidoNumero || ''} onChange={e => updateObra(id, 'pedidoNumero', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Data do Pedido</label>
+                  <input type="date" style={fieldStyle} value={obra.pedidoData || ''} onChange={e => updateObra(id, 'pedidoData', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>ART Nº</label>
+                  <input style={fieldStyle} value={obra.artNumero || ''} onChange={e => updateObra(id, 'artNumero', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Data da ART</label>
+                  <input type="date" style={fieldStyle} value={obra.artData || ''} onChange={e => updateObra(id, 'artData', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Nota Fiscal Nº</label>
+                  <input style={fieldStyle} value={obra.nfNumero || ''} onChange={e => updateObra(id, 'nfNumero', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Data da NF</label>
+                  <input type="date" style={fieldStyle} value={obra.nfData || ''} onChange={e => updateObra(id, 'nfData', e.target.value)} />
+                </div>
+              </div>
+              {propostaPrincipal && (
+                <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--background)', borderRadius: 8, fontSize: 13 }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>PTC Referência: </span>
+                  <span>{propostaPrincipal.nome}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Bloco: Equipamento */}
+            <div className="card">
+              <p style={sectionTitleStyle}>Equipamento</p>
+              <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>Material / Tipo do Equipamento</label>
+                  <input style={fieldStyle} placeholder="Ex: AÇO CARBONO, PRFV, CONCRETO" value={obra.materialEquipamento || ''} onChange={e => updateObra(id, 'materialEquipamento', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Diâmetro</label>
+                  <input style={fieldStyle} placeholder="Ex: 3.000 mm" value={dim.diametro || ''} onChange={e => handleDim('diametro', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Altura</label>
+                  <input style={fieldStyle} placeholder="Ex: 8.500 mm" value={dim.altura || ''} onChange={e => handleDim('altura', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Área (m²)</label>
+                  <input style={fieldStyle} placeholder="Ex: 85,00" value={dim.area || ''} onChange={e => handleDim('area', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Responsável do Cliente (acompanhante)</label>
+                  <input style={fieldStyle} placeholder="Nome e cargo" value={obra.responsavelCliente || ''} onChange={e => updateObra(id, 'responsavelCliente', e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            {/* Bloco: Garantia e Descrição */}
+            <div className="card">
+              <p style={sectionTitleStyle}>Garantia e Descrição Técnica</p>
+              <div style={{ ...gridStyle, gridTemplateColumns: '1fr 1fr' }}>
+                <div>
+                  <label style={labelStyle}>Prazo de Garantia (meses)</label>
+                  <input type="number" min="1" style={fieldStyle} value={obra.garantiaMeses ?? 36} onChange={e => updateObra(id, 'garantiaMeses', parseInt(e.target.value) || 36)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Periodicidade de Inspeção (meses)</label>
+                  <input type="number" min="1" style={fieldStyle} value={obra.inspecaoMeses ?? 12} onChange={e => updateObra(id, 'inspecaoMeses', parseInt(e.target.value) || 12)} />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>Descrição Técnica do Serviço (texto da Introdução)</label>
+                  <textarea
+                    rows={4}
+                    style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }}
+                    placeholder="Descreva o serviço executado conforme o RTE..."
+                    value={obra.descricaoTecnica || ''}
+                    onChange={e => updateObra(id, 'descricaoTecnica', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+          </div>
+        );
+      })()}
 
       {/* Modal: Finalizar Obra */}
       <Modal isOpen={isFinalizarModal} onClose={() => setIsFinalizarModal(false)} title="Finalizar Obra">
