@@ -227,7 +227,7 @@ body {
   font-size: 9pt;
 }
 .header-table td {
-  border: 0.75pt solid #333;
+  border: 0.75pt solid #1a3a6b;
   padding: 3px 6px;
   vertical-align: middle;
 }
@@ -235,24 +235,28 @@ body {
   width: 18%;
   text-align: center;
   padding: 4px;
+  background: #1a3a6b;
+  color: #fff;
 }
 .header-table .logo-cell img {
   max-height: 42px;
   max-width: 100%;
   object-fit: contain;
+  filter: brightness(0) invert(1);
 }
 .header-table .logo-cell .emp-nome {
   font-size: 10pt;
   font-weight: 700;
-  color: #1E3A8A;
+  color: #fff;
 }
 .header-table .doc-title-cell {
   width: 52%;
   text-align: center;
   font-size: 9.5pt;
   font-weight: 700;
-  color: #1E3A8A;
+  color: #1a3a6b;
   letter-spacing: 0.02em;
+  background: #f0f4ff;
 }
 .header-table .doc-meta td {
   font-size: 8.5pt;
@@ -263,10 +267,11 @@ body {
 .doc-footer {
   position: fixed;
   bottom: 0; left: 0; right: 0;
-  background: #1E3A8A;
-  color: #fff;
+  background: #fff;
+  border-top: 2px solid #1a3a6b;
+  color: #1a3a6b;
   font-size: 8pt;
-  padding: 6px 40px;
+  padding: 5px 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -280,10 +285,35 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   min-height: 240mm;
   text-align: center;
   page-break-after: always;
+}
+.capa-banner {
+  width: 100%;
+  background: #1a3a6b;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  margin-bottom: 28pt;
+  align-self: stretch;
+}
+.capa-banner img {
+  max-height: 55px;
+  max-width: 200px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  margin-bottom: 8px;
+}
+.capa-banner-nome {
+  font-size: 13pt;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .capa-logo img {
   max-height: 70px;
@@ -328,8 +358,8 @@ body {
 }
 .capa-meta td:first-child {
   font-weight: 700;
-  color: #1E3A8A;
-  background: #f3f6fc;
+  color: #fff;
+  background: #1a3a6b;
 }
 
 /* ── Seções ── */
@@ -339,8 +369,8 @@ body {
 .secao-titulo {
   font-size: 11.5pt;
   font-weight: 700;
-  color: #1E3A8A;
-  border-bottom: 1.5pt solid #1E3A8A;
+  color: #1a3a6b;
+  border-bottom: 2pt solid #1a3a6b;
   padding-bottom: 3pt;
   margin-bottom: 10pt;
   text-transform: uppercase;
@@ -482,6 +512,8 @@ body {
 </head>
 <body>
 
+<div style="position:fixed;left:0;top:0;bottom:0;width:8px;background:#1a3a6b;z-index:300;print-color-adjust:exact;-webkit-print-color-adjust:exact;"></div>
+
 <!-- Cabeçalho fixo -->
 <div class="doc-header">
   <table class="header-table">
@@ -504,18 +536,17 @@ body {
 
 <!-- Rodapé fixo -->
 <div class="doc-footer">
-  <span>${nomeEmpresa} · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000</span>
-  <span>${esc(empresa?.email || 'contato@engeplar.com.br')} · ${esc(empresa?.site || 'www.engeplar.com.br')}</span>
+  <span>${nomeEmpresa} · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · ${esc(empresa?.email || 'contato@engeplar.com.br')}</span>
+  <span>Página</span>
 </div>
 
 <div class="content">
 
   <!-- 1. CAPA -->
   <div class="capa">
-    <div class="capa-logo">
-      ${empresa?.logo
-        ? `<img src="${esc(empresa.logo)}" alt="Logo" />`
-        : `<div class="emp-nome-capa">${nomeEmpresa}</div>`}
+    <div class="capa-banner">
+      ${empresa?.logo ? `<img src="${esc(empresa.logo)}" alt="Logo" />` : ''}
+      <div class="capa-banner-nome">${nomeEmpresa} Indústria e Comércio Ltda</div>
     </div>
     <div class="capa-titulo">Relatório Técnico de Execução</div>
     <div class="capa-subtitulo">${tipoLabel || esc(obra.nome || '')}</div>
@@ -695,10 +726,7 @@ body {
         </tr>` : '').join('')}
       </tbody>
     </table>
-    <p style="margin-top:14pt;font-size:9pt;color:#6b7280;text-align:center;">
-      ${nomeEmpresa} Indústria e Comércio Ltda. · Rua Amazonas, 475 — Bairro Cruzeiro · CEP 89121-000 · Rio dos Cedros — SC<br>
-      Fone: ${esc(empresa?.telefone || '(47) 3386-0000')} · ${esc(empresa?.email || 'contato@engeplar.com.br')} · ${esc(empresa?.site || 'www.engeplar.com.br')}
-    </p>`)}
+`)}
 
 </div>
 
