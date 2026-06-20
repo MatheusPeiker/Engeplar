@@ -155,7 +155,7 @@ body {
 /* ── @page: margens que deixam espaço para header/footer fixos ── */
 @page {
   size: A4;
-  margin: 82px 42px 72px 42px;
+  margin: 82px 42px 72px 20mm;
 }
 
 /* ── Header fixo (logo + endereço) ── */
@@ -167,7 +167,7 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 6px 42px 0 42px;
+  padding: 6px 42px 0 20mm;
   border-bottom: 1.5pt solid #1a3a6b;
   z-index: 200;
 }
@@ -193,7 +193,7 @@ body {
 .doc-footer .footer-id-line {
   display: flex;
   justify-content: space-between;
-  padding: 2px 42px;
+  padding: 2px 42px 2px 20mm;
   font-size: 8pt;
   color: #333;
   border-top: 0.5pt solid #aaa;
@@ -204,7 +204,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 42px;
+  padding: 4px 42px 4px 20mm;
   font-size: 8.5pt;
 }
 .doc-footer .footer-bar .footer-brand {
@@ -411,11 +411,27 @@ table.capa-info .ptc-num {
   color: #444;
 }
 
+/* ── Barra lateral ── */
+.barra-lateral {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: 10mm;
+  background: #1a3a6b;
+  z-index: 0;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.num-pagina::after {
+  content: counter(page);
+}
+
 /* ── Print específico ── */
 @media print {
   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .doc-header, .doc-footer { position: fixed; }
   .watermark { position: fixed; }
+  .barra-lateral { display: block !important; }
 }
 </style>
 </head>
@@ -447,6 +463,7 @@ table.capa-info .ptc-num {
 <div class="doc-footer">
   <div class="footer-id-line">
     <span>PROPOSTA TÉCNICA COMERCIAL &nbsp;-----------------------------------&nbsp; ${numCompleto}</span>
+    <span>Página <span class="num-pagina"></span></span>
   </div>
   <div class="footer-bar">
     <div class="footer-brand">
@@ -467,6 +484,7 @@ ${logoUrl ? `<img class="watermark" src="${esc(logoUrl)}" alt="" />` : ''}
 <!-- ════════════════════════════════════════════════
      CONTEÚDO DO DOCUMENTO
 ═════════════════════════════════════════════════ -->
+<div class="barra-lateral"></div>
 <div class="doc-content">
 
 <!-- ──────────────────────────────────────────────

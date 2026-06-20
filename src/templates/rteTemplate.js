@@ -210,7 +210,7 @@ body {
 
 @page {
   size: A4;
-  margin: 85px 40px 60px 40px;
+  margin: 85px 40px 60px 20mm;
 }
 
 /* ── Cabeçalho fixo ── */
@@ -218,7 +218,7 @@ body {
   position: fixed;
   top: 0; left: 0; right: 0;
   background: #fff;
-  padding: 4px 40px 0 40px;
+  padding: 4px 40px 0 20mm;
   z-index: 200;
 }
 .header-table {
@@ -235,8 +235,10 @@ body {
   width: 18%;
   text-align: center;
   padding: 4px;
-  background: #1a3a6b;
+  background: #1a3a6b !important;
   color: #fff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 .header-table .logo-cell img {
   max-height: 42px;
@@ -271,7 +273,7 @@ body {
   border-top: 2px solid #1a3a6b;
   color: #1a3a6b;
   font-size: 8pt;
-  padding: 5px 40px;
+  padding: 5px 40px 5px 20mm;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -505,14 +507,27 @@ body {
 .page-break { page-break-after: always; }
 .page-break-inside-avoid { page-break-inside: avoid; }
 
+.barra-lateral {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: 10mm;
+  background: #1a3a6b;
+  z-index: 0;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.num-pagina::after {
+  content: counter(page);
+}
+
 @media print {
   .doc-header, .doc-footer { display: block !important; }
+  .barra-lateral { display: block !important; }
 }
 </style>
 </head>
 <body>
-
-<div style="position:fixed;left:0;top:0;bottom:0;width:8px;background:#1a3a6b;z-index:300;print-color-adjust:exact;-webkit-print-color-adjust:exact;"></div>
 
 <!-- Cabeçalho fixo -->
 <div class="doc-header">
@@ -521,7 +536,7 @@ body {
       <td class="logo-cell" rowspan="2">
         ${empresa?.logo
           ? `<img src="${esc(empresa.logo)}" alt="Logo" />`
-          : `<div class="emp-nome">${nomeEmpresa}</div>`}
+          : `<span style="color:white; font-weight:bold; font-size:9pt; text-align:center; display:block;">ENGEPLAR</span>`}
       </td>
       <td class="doc-title-cell" rowspan="2">
         RELATÓRIO TÉCNICO DE EXECUÇÃO
@@ -537,16 +552,17 @@ body {
 <!-- Rodapé fixo -->
 <div class="doc-footer">
   <span>${nomeEmpresa} · Rua Amazonas, 475 — Rio dos Cedros/SC · (47) 3386-0000 · ${esc(empresa?.email || 'contato@engeplar.com.br')}</span>
-  <span>Página</span>
+  <span>Página <span class="num-pagina"></span></span>
 </div>
 
 <div class="content">
+<div class="barra-lateral"></div>
 
   <!-- 1. CAPA -->
   <div class="capa">
     <div class="capa-banner">
       ${empresa?.logo ? `<img src="${esc(empresa.logo)}" alt="Logo" />` : ''}
-      <div class="capa-banner-nome">${nomeEmpresa} Indústria e Comércio Ltda</div>
+      <div class="capa-banner-nome">${nomeEmpresa}</div>
     </div>
     <div class="capa-titulo">Relatório Técnico de Execução</div>
     <div class="capa-subtitulo">${tipoLabel || esc(obra.nome || '')}</div>
