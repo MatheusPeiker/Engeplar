@@ -160,14 +160,25 @@ export const AppProvider = ({ children }) => {
 
   // ── Auth listener ─────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    let settled = false;
+    const finish = (sess) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(fallback);
+      setSession(sess ?? null);
       setAuthLoading(false);
-    });
+    };
+    // Safety net: if getSession never resolves (paused project / no network), unblock after 8s
+    const fallback = setTimeout(() => finish(null), 8000);
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => finish(session))
+      .catch(() => finish(null));
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-    return () => subscription.unsubscribe();
+    return () => { subscription.unsubscribe(); clearTimeout(fallback); };
   }, []);
 
   // ── Load data on login ────────────────────────────────────
