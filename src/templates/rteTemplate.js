@@ -221,6 +221,9 @@ body {
   background: #fff;
   padding: 4px 40px 0 40px;
   z-index: 200;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  color-adjust: exact;
 }
 .header-table {
   width: 100%;
@@ -237,9 +240,11 @@ body {
   text-align: center;
   padding: 4px;
   background: #1a3a6b !important;
+  background-color: #1a3a6b !important;
   color: #fff;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+  color-adjust: exact;
 }
 .header-table .logo-cell img {
   max-height: 42px;
@@ -276,6 +281,7 @@ body {
   padding: 0 40px;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+  color-adjust: exact;
 }
 .footer-id-line {
   display: flex;
@@ -287,7 +293,11 @@ body {
 }
 .footer-bar {
   background: #1a3a6b;
+  background-color: #1a3a6b;
   color: #fff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  color-adjust: exact;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -538,8 +548,14 @@ body {
 .page-break-inside-avoid { page-break-inside: avoid; }
 
 @media print {
-  .doc-header { display: block !important; }
-  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .doc-header { display: block !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
+  .doc-header *, .doc-footer * { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
+  .footer-bar { background-color: #1a3a6b !important; color: #fff !important; }
+  .capa-banner { background-color: #1a3a6b !important; }
+  .capa-meta td:first-child { background-color: #1a3a6b !important; }
+  .secao-num { background-color: #1E3A8A !important; }
+  .tabela-contatos th { background-color: #1E3A8A !important; }
 }
 </style>
 </head>
@@ -549,7 +565,7 @@ body {
 <div class="doc-header">
   <table class="header-table">
     <tr>
-      <td rowspan="2" style="background-color:#1a3a6b !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; color:#ffffff; width:110px; text-align:center; padding:6px; vertical-align:middle;">
+      <td rowspan="2" style="background-color:#1a3a6b; -webkit-print-color-adjust:exact; print-color-adjust:exact; color-adjust:exact; color:#ffffff; width:110px; text-align:center; padding:6px; vertical-align:middle;">
         ${empresa?.logo
           ? `<img src="${esc(empresa.logo)}" alt="Logo" style="max-height:42px;max-width:100%;object-fit:contain;filter:brightness(0) invert(1);" />`
           : `<span style="color:white;font-weight:bold;font-size:9pt;text-align:center;display:block;">ENGEPLAR</span>`}
