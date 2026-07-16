@@ -200,6 +200,28 @@ export const AppProvider = ({ children }) => {
     setPtcs([]); setRvts([]); setTiposServico([]);
   };
 
+  // Reposiciona as obras cujo lat/lng não corresponde ao endereço atual. Cobre as
+  // obras criadas antes da geocodificação existir, que receberam coordenada aleatória.
+  // Roda em segundo plano: o mapa se corrige sozinho conforme cada obra é resolvida.
+  const geocodificarObrasPendentes = async (rows, userId) => {
+    const pendentes = rows.filter(r => (r.endereco || '').trim() && r.geo_endereco !== r.endereco);
+    for (const row of pendentes) {
+      const location = await geocodeEndereco(row.endereco);
+      if (!location) continue;
+      const { error } = await supabase.from('obras')
+        .update({ lat: location[0], lng: location[1], geo_endereco: row.endereco })
+        .eq('id', row.id).eq('user_id', userId);
+      if (error) {
+        console.warn(
+          '[geocode] Não foi possível gravar as coordenadas das obras. ' +
+          'Execute supabase/schema_v7_geocode.sql no SQL Editor do Supabase.', error.message
+        );
+        return;
+      }
+      setObras(prev => prev.map(o => o.id === row.id ? { ...o, location } : o));
+    }
+  };
+
   const loadAllData = async (uid) => {
     setDataLoading(true);
     const [
@@ -226,7 +248,10 @@ export const AppProvider = ({ children }) => {
       supabase.from('tipos_servico').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     ]);
 
-    if (obrasRes.data)    setObras(obrasRes.data.map(norm.obra));
+    if (obrasRes.data) {
+      setObras(obrasRes.data.map(norm.obra));
+      geocodificarObrasPendentes(obrasRes.data, uid);
+    }
     if (clientesRes.data) setClientes(clientesRes.data);
     if (fornRes.data)     setFornecedores(fornRes.data);
     if (funcRes.data)     setFuncionarios(funcRes.data.map(norm.funcionario));
@@ -358,13 +383,14 @@ export const AppProvider = ({ children }) => {
 
   const addObra = async (novaObra) => {
     const tempId = `tmp_${Date.now()}`;
-    const [lat, lng] = (await geocodeEndereco(novaObra.endereco)) ?? FALLBACK_LOCATION;
+    const encontrado = await geocodeEndereco(novaObra.endereco);
+    const [lat, lng] = encontrado ?? FALLBACK_LOCATION;
     const local = { ...novaObra, id: tempId, location: [lat, lng], gastosDespesas: [] };
     setObras(prev => [local, ...prev]);
     const { data, error } = await supabase.from('obras').insert({
       nome: novaObra.nome, endereco: novaObra.endereco, status: novaObra.status,
       previsao: novaObra.previsao, orcamento: novaObra.orcamento || 0,
-      lat, lng, user_id: uid()
+      lat, lng, geo_endereco: encontrado ? novaObra.endereco : null, user_id: uid()
     }).select('*, gastos_despesas(*)').single();
     if (error) { setObras(prev => prev.filter(o => o.id !== tempId)); return null; }
     setObras(prev => prev.map(o => o.id === tempId ? norm.obra(data) : o));
@@ -395,7 +421,8 @@ export const AppProvider = ({ children }) => {
       const location = await geocodeEndereco(valor);
       if (location) {
         setObras(prev => prev.map(o => o.id === obraId ? { ...o, location } : o));
-        await supabase.from('obras').update({ lat: location[0], lng: location[1] })
+        await supabase.from('obras')
+          .update({ lat: location[0], lng: location[1], geo_endereco: valor })
           .eq('id', obraId).eq('user_id', uid());
       }
     }
