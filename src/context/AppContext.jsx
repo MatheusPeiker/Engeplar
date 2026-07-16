@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { geocodeEndereco, FALLBACK_LOCATION } from '../lib/geocode';
 
 const AppContext = createContext();
 
@@ -357,8 +358,7 @@ export const AppProvider = ({ children }) => {
 
   const addObra = async (novaObra) => {
     const tempId = `tmp_${Date.now()}`;
-    const lat = -23.55 + (Math.random() * 0.1 - 0.05);
-    const lng = -46.63 + (Math.random() * 0.1 - 0.05);
+    const [lat, lng] = (await geocodeEndereco(novaObra.endereco)) ?? FALLBACK_LOCATION;
     const local = { ...novaObra, id: tempId, location: [lat, lng], gastosDespesas: [] };
     setObras(prev => [local, ...prev]);
     const { data, error } = await supabase.from('obras').insert({
@@ -389,6 +389,16 @@ export const AppProvider = ({ children }) => {
       dadosRte: 'dados_rte',
     }[campo] || campo;
     await supabase.from('obras').update({ [dbField]: valor }).eq('id', obraId).eq('user_id', uid());
+
+    // O endereço define a posição da obra no mapa de equipes: reposiciona ao alterá-lo.
+    if (campo === 'endereco') {
+      const location = await geocodeEndereco(valor);
+      if (location) {
+        setObras(prev => prev.map(o => o.id === obraId ? { ...o, location } : o));
+        await supabase.from('obras').update({ lat: location[0], lng: location[1] })
+          .eq('id', obraId).eq('user_id', uid());
+      }
+    }
   }, [registrarAlteracao]);
 
   const deleteObra = useCallback(async (obraId) => {

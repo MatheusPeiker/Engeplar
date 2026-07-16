@@ -3,7 +3,8 @@ import { Plus, Trash2, MapPin, Briefcase } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -15,21 +16,31 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
+function FitBounds({ locations }) {
+  const map = useMap();
+  // Compara por valor: o array de locations é recriado a cada render.
+  const key = JSON.stringify(locations);
+  useEffect(() => {
+    const pontos = JSON.parse(key);
+    if (pontos.length === 0) return;
+    map.fitBounds(pontos, { padding: [40, 40], maxZoom: 15 });
+  }, [map, key]);
+  return null;
+}
+
 function EquipeMap({ obras, funcionarios }) {
   const obrasComFuncionarios = obras.filter(o =>
-    funcionarios.some(f => f.obraAtualId === o.id)
+    o.location && funcionarios.some(f => f.obraAtualId === o.id)
   );
-
-  const center = obrasComFuncionarios.length > 0
-    ? obrasComFuncionarios[0].location
-    : [-23.5505, -46.6333];
+  const locations = obrasComFuncionarios.map(o => o.location);
 
   return (
     <MapContainer
-      center={center}
+      center={locations[0] ?? [-23.5505, -46.6333]}
       zoom={13}
       style={{ height: 300, width: '100%', borderRadius: 12, zIndex: 0 }}
     >
+      <FitBounds locations={locations} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
