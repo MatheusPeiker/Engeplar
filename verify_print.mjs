@@ -1,11 +1,16 @@
-// Script temporário para gerar HTML de teste do RTE
+// Script para gerar HTML de teste do RTE (abrir no Chrome e usar Ctrl+P para conferir a impressão)
 import { gerarHTMLRTE } from './src/templates/rteTemplate.js';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync } from 'fs';
+
+// Data URI: o documento precisa ser autossuficiente, sem depender do dev server
+const comoDataUri = (arquivo) => 'data:image/png;base64,'
+  + readFileSync(arquivo).toString('base64');
 
 const empresa = {
   nomeFantasia: 'Engeplar',
   razaoSocial: 'Engeplar Indústria e Comércio Ltda',
-  logo: 'http://localhost:5173/src/assets/logo.jpeg',
+  logo: comoDataUri('./src/assets/logo-documento.png'),
+  simbolo: comoDataUri('./src/assets/simbolo-engeplar.png'),
   endereco: 'Rua Amazonas, 475 — Rio dos Cedros/SC',
   telefone: '(47) 3386-0000',
   email: 'contato@engeplar.com.br',

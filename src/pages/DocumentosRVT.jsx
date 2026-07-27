@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { FilePlus, FileText, Search, ChevronLeft, Trash2, Eye, Plus, Minus } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { gerarHTMLRVT } from '../templates/rvtTemplate';
+import { empresaParaImpressao } from '../lib/logo';
 
 const STATUS = {
   rascunho: { label: 'Rascunho', color: 'var(--text-muted)',   bg: 'var(--background)' },
@@ -46,10 +47,11 @@ export default function DocumentosRVT() {
 
   const set = (campo, valor) => { if (currentId) updateRVT(currentId, campo, valor); };
 
-  const handleGerarPDF = () => {
+  const handleGerarPDF = async () => {
     if (!rvt) return;
-    const html = gerarHTMLRVT(rvt, empresa);
+    // Abre a janela no clique (evita bloqueio de pop-up) e resolve a logo antes de escrever
     const win = window.open('', '_blank');
+    const html = gerarHTMLRVT(rvt, await empresaParaImpressao(empresa));
     if (win) { win.document.write(html); win.document.close(); }
   };
 

@@ -144,8 +144,12 @@ body {
   font-weight: 600;
 }
 .footer-bar .footer-brand img {
+  /* Placa branca em vez de filtro: brightness(0) invert(1) deixava a logo
+     azul como um retângulo branco sólido sobre a barra escura. */
   height: 20px;
-  filter: brightness(0) invert(1);
+  background: #fff;
+  padding: 1.5px 4px;
+  border-radius: 2px;
 }
 .footer-bar .footer-contacts {
   display: flex;

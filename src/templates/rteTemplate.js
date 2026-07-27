@@ -1,3 +1,8 @@
+import {
+  esc, logoImgHtml, marcaAguaHtml, rodapeHtml, cabecalhoHtml,
+  criarNumerador, secaoHtml, campoHtml, documentoHTML,
+} from './documentoBase.js';
+
 /**
  * Template HTML/CSS do RTE — Relatório Técnico de Execução Engeplar
  *
@@ -5,21 +10,39 @@
  * RTE-0016.10.25 (BRF Fortaleza), RTE-0015.10.25 (BRF Tatuí),
  * RTE-0027.05.24 (Toyo Setal).
  *
- * Seções: 1-CAPA 2-AGRADECIMENTOS 3-INTRODUÇÃO 4-DESCRIÇÃO 5-ESTRUTURA
- *          6-PROCEDIMENTO 7-ENSAIOS 8-GARANTIA 9-IMAGENS 10-PEDIDO
- *          11-PROPOSTA 12-CONTATOS
+ * Seções: CAPA · AGRADECIMENTOS · INTRODUÇÃO · DESCRIÇÃO · ESTRUTURA
+ *          PROCEDIMENTO · ENSAIOS · GARANTIA · IMAGENS FINAIS · PEDIDO
+ *          PROPOSTA · CONTATOS
+ *
+ * As seções fotográficas (estrutura, procedimento, imagens finais) só entram no
+ * documento quando há imagem anexada — nada de quadros "inserir imagem" vazios.
+ * Por isso a numeração é sequencial em tempo de geração (`numSecao`), sem furos.
+ *
+ * A estrutura de página (capa, cabeçalho, faixa, rodapé, marca d'água) vem de
+ * ./documentoBase — a mesma usada pela PTC, para os dois documentos terem
+ * exatamente a mesma aparência.
  *
  * @param {Object} obra       Dados da obra (com campos RTE)
  * @param {Object} empresa    Dados da empresa
  * @param {Array}  cronograma Etapas do cronograma
  * @param {Object} proposta   Proposta principal vinculada à obra
  * @param {Array}  tecnicos   Funcionários alocados na obra
+ * @param {Object} fotos      Imagens por seção: { estrutura, 'proc-<i>', procedimento,
+ *                            ensaios, final } → [{ src, legenda }]. Grupos vazios
+ *                            fazem a seção correspondente não ser impressa.
  * @returns {string}          HTML completo pronto para window.open + print
  */
-export function gerarHTMLRTE(obra, empresa, cronograma = [], proposta = null, tecnicos = []) {
-  const esc = (s) => s == null ? '' : String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+export function gerarHTMLRTE(obra, empresa, cronograma = [], proposta = null, tecnicos = [], fotos = {}) {
+  // Remove pontuação final para encaixar o texto dentro de uma frase
+  const frase = (s) => esc(String(s || '').trim().replace(/[.;,]+$/, ''));
+
+  /* Acrescenta a unidade só quando o valor digitado ainda não a traz —
+     evita saídas como "45 m² m²" quando o usuário informa a unidade no campo. */
+  const unid = (v, u) => {
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    return s.toLowerCase().endsWith(u.toLowerCase()) ? s : `${s} ${u}`;
+  };
 
   const fmt = (d) => {
     if (!d) return '___/___/______';
@@ -41,8 +64,11 @@ export function gerarHTMLRTE(obra, empresa, cronograma = [], proposta = null, te
   const nomeEmpresa = esc(empresa?.nomeFantasia || empresa?.razaoSocial || 'Engeplar');
   const rteNum = esc(obra.rteNumero || 'RTE – ____.__.__ REV00');
   const ptcRef = esc(proposta?.ptc_numero || proposta?.nome || '___________________');
+  const local = esc(proposta?.clienteEndereco || obra.endereco || '');
 
   const d = obra.dadosRte || {};
+
+  const logoImg = (classe) => logoImgHtml(empresa?.logo, classe, nomeEmpresa);
 
   // Tipo de serviço → texto descritivo
   const TIPOS_SERVICO = {
@@ -57,34 +83,31 @@ export function gerarHTMLRTE(obra, empresa, cronograma = [], proposta = null, te
 
   // Bloco técnico específico por tipo (seção 4 do PDF)
   const blocoTecnico = (() => {
-    const row = (label, val) => val ? `<tr><td style="font-weight:700;color:#374151;padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;white-space:nowrap;font-size:10pt;">${esc(label)}</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">${esc(val)}</td></tr>` : '';
-    const tbl = (rows) => `<table style="width:100%;border-collapse:collapse;margin-top:6pt;">${rows}</table>`;
+    const row = (label, val) => val ? `<tr><th class="k">${esc(label)}</th><td class="v">${esc(val)}</td></tr>` : '';
+    const tbl = (rows) => rows ? `<table class="tab-dados">${rows}</table>` : '';
 
     switch (obra.tipoServico) {
       case 'REVESTIMENTO_PINTURA': {
         const camadas = [1, 2, 3].filter(n => d[`camada_${n}_material`]).map(n => `
           <tr>
-            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;font-weight:600;">Camada ${n}</td>
-            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">${esc(d[`camada_${n}_material`] || '')}</td>
-            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">${esc(d[`camada_${n}_cor`] || '—')}</td>
-            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;">${d[`camada_${n}_esp_umida`] ? d[`camada_${n}_esp_umida`] + ' µm úmida' : '—'}</td>
-            <td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;">${d[`camada_${n}_esp_seca`] ? d[`camada_${n}_esp_seca`] + ' µm seca' : '—'}</td>
+            <td class="c-forte">Camada ${n}</td>
+            <td>${esc(d[`camada_${n}_material`] || '')}</td>
+            <td>${esc(d[`camada_${n}_cor`] || '—')}</td>
+            <td class="num">${esc(unid(d[`camada_${n}_esp_umida`], 'µm')) || '—'}</td>
+            <td class="num">${esc(unid(d[`camada_${n}_esp_seca`], 'µm')) || '—'}</td>
           </tr>`).join('');
         return `
           ${tbl(row('Produto / Sistema', d.produto_nome) + row('Fabricante', d.fabricante) + row('Preparo de Superfície', d.norma_jato) + row('Sistema de Aplicação', d.sistema_aplicacao))}
           ${camadas ? `
-          <p style="font-weight:700;font-size:10pt;margin:10pt 0 4pt;color:#1E3A8A;">Esquema de Pintura</p>
-          <table style="width:100%;border-collapse:collapse;">
-            <thead><tr style="background:#1E3A8A;color:#fff;">
-              <th style="padding:4pt 8pt;font-size:9pt;text-align:left;">Camada</th>
-              <th style="padding:4pt 8pt;font-size:9pt;text-align:left;">Material</th>
-              <th style="padding:4pt 8pt;font-size:9pt;text-align:left;">Cor</th>
-              <th style="padding:4pt 8pt;font-size:9pt;">Esp. Úmida</th>
-              <th style="padding:4pt 8pt;font-size:9pt;">Esp. Seca</th>
+          <p class="rotulo-bloco">Esquema de Pintura</p>
+          <table class="tab-grid">
+            <thead><tr>
+              <th>Camada</th><th>Material</th><th>Cor</th>
+              <th class="num">Esp. Úmida</th><th class="num">Esp. Seca</th>
             </tr></thead>
             <tbody>${camadas}</tbody>
           </table>
-          ${d.espessura_total ? `<p style="font-size:10pt;font-weight:700;margin-top:6pt;">Espessura Total Seca: <span style="color:#1E3A8A;">${esc(d.espessura_total)} µm</span></p>` : ''}` : ''}`;
+          ${d.espessura_total ? `<p class="destaque">Espessura Total Seca: <span>${esc(d.espessura_total)} µm</span></p>` : ''}` : ''}`;
       }
       case 'REVESTIMENTO_IMPERMEABILIZANTE': {
         return tbl(
@@ -99,20 +122,20 @@ export function gerarHTMLRTE(obra, empresa, cronograma = [], proposta = null, te
         return tbl(
           row('Tipo de Manta', d.tipo_manta) + row('Resina', d.resina) +
           row('Tratamento Químico', d.tratamento_quimico) + row('Acabamento', d.acabamento) +
-          row('Áreas Executadas', areas) + row('Área Total', d.area_total_m2 ? d.area_total_m2 + ' m²' : '')
+          row('Áreas Executadas', areas) + row('Área Total', unid(d.area_total_m2, 'm²'))
         );
       }
       case 'INJECAO_QUIMICA':
         return tbl(
           row('Produto Injetado', d.produto_injetado) +
           row('Total de Pontos', d.total_pontos) +
-          row('Área Recuperada', d.area_recuperada_m2 ? d.area_recuperada_m2 + ' m²' : '') +
+          row('Área Recuperada', unid(d.area_recuperada_m2, 'm²')) +
           row('Áreas Recuperadas', d.descricao_areas)
         );
       case 'SOLDA_PLASTICA':
         return tbl(
           row('Material Base', d.material_base) + row('Tipo de Solda', d.tipo_solda) +
-          row('Área Reparada', d.area_reparada_m2 ? d.area_reparada_m2 + ' m²' : '') +
+          row('Área Reparada', unid(d.area_reparada_m2, 'm²')) +
           row('Descrição', d.descricao)
         );
       case 'CONSTRUCAO':
@@ -127,37 +150,37 @@ export function gerarHTMLRTE(obra, empresa, cronograma = [], proposta = null, te
     switch (obra.tipoServico) {
       case 'REVESTIMENTO_PINTURA': {
         const medidas = [1,2,3].filter(n => d[`camada_${n}_esp_seca`]).map(n =>
-          `<tr><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Camada ${n} — ${esc(d[`camada_${n}_material`] || '')}</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;font-weight:700;">${esc(d[`camada_${n}_esp_seca`])} µm</td></tr>`).join('');
-        return `<p style="margin-bottom:8pt;font-size:10.5pt;">Leitura de espessura de película seca por ultrassom — conforme ficha técnica do fabricante.</p>
-          ${medidas ? `<table style="width:100%;border-collapse:collapse;max-width:360pt;">
-            <thead><tr style="background:#1E3A8A;color:#fff;"><th style="padding:5pt 8pt;font-size:9pt;text-align:left;">Camada</th><th style="padding:5pt 8pt;font-size:9pt;text-align:right;">Espessura Seca</th></tr></thead>
+          `<tr><td>Camada ${n} — ${esc(d[`camada_${n}_material`] || '')}</td><td class="num forte">${esc(d[`camada_${n}_esp_seca`])} µm</td></tr>`).join('');
+        return `<p class="texto-justificado">Leitura de espessura de película seca por ultrassom — conforme ficha técnica do fabricante.</p>
+          ${medidas ? `<table class="tab-grid estreita">
+            <thead><tr><th>Camada</th><th class="num">Espessura Seca</th></tr></thead>
             <tbody>${medidas}</tbody>
           </table>
-          ${d.espessura_total ? `<p style="font-size:10pt;font-weight:700;margin-top:8pt;">Total: ${esc(d.espessura_total)} µm</p>` : ''}` : ''}`;
+          ${d.espessura_total ? `<p class="destaque">Total: <span>${esc(d.espessura_total)} µm</span></p>` : ''}` : ''}`;
       }
       case 'REVESTIMENTO_IMPERMEABILIZANTE':
-        return `<p style="margin-bottom:8pt;font-size:10.5pt;">Leitura de espessura da camada aplicada interna e externamente.</p>
-          <table style="width:100%;border-collapse:collapse;max-width:300pt;">
-            <thead><tr style="background:#1E3A8A;color:#fff;"><th style="padding:5pt 8pt;font-size:9pt;text-align:left;">Posição</th><th style="padding:5pt 8pt;font-size:9pt;text-align:right;">Espessura (µm)</th></tr></thead>
+        return `<p class="texto-justificado">Leitura de espessura da camada aplicada interna e externamente.</p>
+          <table class="tab-grid estreita">
+            <thead><tr><th>Posição</th><th class="num">Espessura (µm)</th></tr></thead>
             <tbody>
-              ${d.espessura_interna ? `<tr><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;">Interna</td><td style="padding:4pt 8pt;border-bottom:0.5pt solid #e5e7eb;font-size:10pt;text-align:right;font-weight:700;">${esc(d.espessura_interna)}</td></tr>` : ''}
-              ${d.espessura_externa ? `<tr><td style="padding:4pt 8pt;font-size:10pt;">Externa</td><td style="padding:4pt 8pt;font-size:10pt;text-align:right;font-weight:700;">${esc(d.espessura_externa)}</td></tr>` : ''}
+              ${d.espessura_interna ? `<tr><td>Interna</td><td class="num forte">${esc(d.espessura_interna)}</td></tr>` : ''}
+              ${d.espessura_externa ? `<tr><td>Externa</td><td class="num forte">${esc(d.espessura_externa)}</td></tr>` : ''}
             </tbody>
           </table>`;
       case 'RECUPERACAO_LINER':
-        return `<p style="font-size:10.5pt;line-height:1.6;">Ensaio de carregamento hidrostático conforme norma vigente. ${d.area_total_m2 ? `Área total executada: <strong>${esc(d.area_total_m2)} m²</strong>.` : ''}</p>`;
+        return `<p class="texto-justificado">Ensaio de carregamento hidrostático conforme norma vigente. ${d.area_total_m2 ? `Área total executada: <strong>${esc(d.area_total_m2)} m²</strong>.` : ''}</p>`;
       case 'INJECAO_QUIMICA':
-        return `<p style="font-size:10.5pt;line-height:1.6;">Inspeção visual das áreas recuperadas.
+        return `<p class="texto-justificado">Inspeção visual das áreas recuperadas.
           ${d.total_pontos ? `Total de pontos de injeção executados: <strong>${esc(String(d.total_pontos))}</strong>.` : ''}
           ${d.area_recuperada_m2 ? ` Área recuperada: <strong>${esc(d.area_recuperada_m2)} m²</strong>.` : ''}
           ${d.descricao_areas ? `<br/><br/>${esc(d.descricao_areas)}` : ''}</p>`;
       case 'SOLDA_PLASTICA':
-        return `<p style="font-size:10.5pt;line-height:1.6;">Ensaio visual e dimensional das soldas realizadas.
+        return `<p class="texto-justificado">Ensaio visual e dimensional das soldas realizadas.
           ${d.area_reparada_m2 ? ` Área reparada: <strong>${esc(d.area_reparada_m2)} m²</strong>.` : ''}</p>`;
       case 'CONSTRUCAO':
-        return `<p style="font-size:10.5pt;">Verificação dimensional e de prumo conforme projeto e norma ${d.norma ? esc(d.norma) : 'aplicável'}.</p>`;
+        return `<p class="texto-justificado">Verificação dimensional e de prumo conforme projeto e norma ${d.norma ? esc(d.norma) : 'aplicável'}.</p>`;
       default:
-        return `<p style="font-size:10.5pt;">Ensaios e testes realizados conforme especificação técnica.</p>`;
+        return `<p class="texto-justificado">Ensaios e testes realizados conforme especificação técnica.</p>`;
     }
   })();
 
@@ -166,614 +189,204 @@ export function gerarHTMLRTE(obra, empresa, cronograma = [], proposta = null, te
   const tecnicoNome = esc(tecnicoPrincipal?.nome || '');
   const tecnicoCargo = esc(tecnicoPrincipal?.funcao || '');
 
-  const fotoPlaceholder = (secao, n = 2) => {
-    let boxes = '';
-    for (let i = 0; i < n; i++) {
-      boxes += `
-        <div class="foto-box">
-          <div class="foto-placeholder">
-            <span>📷 Foto ${secao} ${i + 1}</span>
-            <p style="font-size:9pt;color:#999;margin-top:4px;">(inserir imagem)</p>
-          </div>
-          <p class="foto-legenda">Legenda da foto ${i + 1}</p>
-        </div>`;
+  // ── Imagens anexadas ──────────────────────────────────────
+  const fotosDe = (id) => (Array.isArray(fotos?.[id]) ? fotos[id] : []).filter(f => f && f.src);
+
+  const fEstrutura = fotosDe('estrutura');
+  const fEnsaios   = fotosDe('ensaios');
+  const fFinal     = fotosDe('final');
+  const fProcSolto = fotosDe('procedimento');
+  // Apenas etapas que receberam foto entram na seção de procedimento
+  const etapasComFoto = cronograma
+    .map((e, i) => ({ etapa: e, fotos: fotosDe(`proc-${i}`) }))
+    .filter(x => x.fotos.length > 0);
+  const temProcedimento = etapasComFoto.length > 0 || fProcSolto.length > 0;
+
+  /* Galeria: linhas de 2 imagens por tabela, com `break-inside: avoid` para que
+     uma linha nunca seja cortada ao meio pela quebra de página. Legendas são
+     numeradas em sequência ao longo de todo o documento. */
+  let figura = 0;
+  const galeria = (lista) => {
+    if (!lista.length) return '';
+    let html = '';
+    for (let i = 0; i < lista.length; i += 2) {
+      const slot = (idx) => {
+        const f = lista[idx];
+        if (!f) return '<td></td>';
+        const n = ++figura;
+        return `
+        <td>
+          <div class="foto-quadro"><img src="${esc(f.src)}" alt="${esc(f.legenda || `Figura ${n}`)}" /></div>
+          <p class="foto-legenda">Figura ${n}${f.legenda ? ' — ' + esc(f.legenda) : ''}</p>
+        </td>`;
+      };
+      html += `<table class="fotos"><tr>${slot(i)}${slot(i + 1)}</tr></table>`;
     }
-    return `<div class="fotos-grid">${boxes}</div>`;
+    return html;
   };
 
-  const secao = (num, titulo, conteudo) => `
-    <div class="secao page-break-inside-avoid">
-      <h2 class="secao-titulo"><span class="secao-num">${num}.</span> ${esc(titulo)}</h2>
-      ${conteudo}
-    </div>`;
+  // Numeração sequencial: a capa é 1 e cada seção emitida pega o próximo número
+  const numSecao = criarNumerador(2);
 
-  const campo = (label, valor) => `
-    <div class="campo-linha">
-      <span class="campo-label">${esc(label)}:</span>
-      <span class="campo-valor">${valor}</span>
-    </div>`;
+  const secao = (titulo, conteudo, novaPagina = false) =>
+    secaoHtml({ num: numSecao(), titulo, conteudo, novaPagina });
 
+  const campo = campoHtml;
 
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>${rteNum}</title>
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  const nota = (txt) => `<p class="nota">${esc(txt)}</p>`;
 
-body {
-  font-family: 'Calibri', 'Arial', sans-serif;
-  font-size: 10.5pt;
-  color: #000;
-  background: #fff;
-}
-
-@page {
-  size: A4;
-  margin: 85px 40px 60px 40px;
-}
-
-/* ── Cabeçalho fixo ── */
-.doc-header {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  background: #fff;
-  padding: 4px 40px 0 40px;
-  z-index: 200;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-  color-adjust: exact;
-}
-.header-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 9pt;
-}
-.header-table td {
-  border: 0.75pt solid #1a3a6b;
-  padding: 3px 6px;
-  vertical-align: middle;
-}
-.header-table .logo-cell {
-  width: 18%;
-  text-align: center;
-  padding: 4px;
-  background: #1a3a6b !important;
-  background-color: #1a3a6b !important;
-  color: #fff;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-  color-adjust: exact;
-}
-.header-table .logo-cell img {
-  max-height: 42px;
-  max-width: 100%;
-  object-fit: contain;
-  filter: brightness(0) invert(1);
-}
-.header-table .logo-cell .emp-nome {
-  font-size: 10pt;
-  font-weight: 700;
-  color: #fff;
-}
-.header-table .doc-title-cell {
-  width: 52%;
-  text-align: center;
-  font-size: 9.5pt;
-  font-weight: 700;
-  color: #1a3a6b;
-  letter-spacing: 0.02em;
-  background: #f0f4ff;
-}
-.header-table .doc-meta td {
-  font-size: 8.5pt;
-  padding: 2px 6px;
-}
-
-/* ── Watermark removido — não usar ── */
-
-/* ── Rodapé fixo ── */
-.doc-footer {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  z-index: 200;
-  padding: 0 40px;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-  color-adjust: exact;
-}
-.footer-id-line {
-  display: flex;
-  justify-content: space-between;
-  padding: 2px 0;
-  font-size: 8pt;
-  color: #444;
-  border-top: 0.5pt solid #888;
-}
-.footer-bar {
-  background: #1a3a6b;
-  background-color: #1a3a6b;
-  color: #fff;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-  color-adjust: exact;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 6px;
-  font-size: 8.5pt;
-}
-.footer-bar .footer-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-}
-.footer-bar .footer-brand img {
-  height: 20px;
-  filter: brightness(0) invert(1);
-}
-.footer-bar .footer-contacts {
-  display: flex;
-  gap: 16px;
-}
-
-/* ── Conteúdo ── */
-.doc-content { position: relative; z-index: 1; margin-top: 14px; }
-
-/* ── Capa ── */
-.capa {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-height: 240mm;
-  text-align: center;
-  flex: 1;
-}
-.capa-banner {
-  width: 100%;
-  background: #1a3a6b;
-  min-height: 120px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  margin-bottom: 28pt;
-  align-self: stretch;
-}
-.capa-banner img {
-  max-height: 55px;
-  max-width: 200px;
-  object-fit: contain;
-  filter: brightness(0) invert(1);
-  margin-bottom: 8px;
-}
-.capa-banner-nome {
-  font-size: 13pt;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.capa-logo img {
-  max-height: 70px;
-  max-width: 220px;
-  object-fit: contain;
-  margin-bottom: 20pt;
-}
-.capa-logo .emp-nome-capa {
-  font-size: 20pt;
-  font-weight: 900;
-  color: #1E3A8A;
-  letter-spacing: 0.05em;
-  margin-bottom: 20pt;
-}
-.capa-titulo {
-  font-size: 18pt;
-  font-weight: 900;
-  color: #1E3A8A;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  border-top: 3pt solid #1E3A8A;
-  border-bottom: 3pt solid #1E3A8A;
-  padding: 10pt 0;
-  width: 80%;
-  margin: 0 auto 16pt;
-}
-.capa-subtitulo {
-  font-size: 12pt;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 28pt;
-}
-.capa-meta table {
-  margin: 0 auto;
-  border-collapse: collapse;
-  font-size: 10pt;
-}
-.capa-meta td {
-  padding: 4pt 12pt;
-  border: 0.5pt solid #999;
-  text-align: left;
-}
-.capa-meta td:first-child {
-  font-weight: 700;
-  color: #fff;
-  background: #1a3a6b;
-}
-
-/* ── Seções ── */
-.secao {
-  margin-bottom: 18pt;
-}
-.secao-titulo {
-  font-size: 11.5pt;
-  font-weight: 700;
-  color: #1a3a6b;
-  border-bottom: 2pt solid #1a3a6b;
-  padding-bottom: 3pt;
-  margin-bottom: 10pt;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.secao-num {
-  display: inline-block;
-  background: #1E3A8A;
-  color: #fff;
-  padding: 0 5pt;
-  border-radius: 2pt;
-  margin-right: 6pt;
-  font-size: 10pt;
-}
-
-/* ── Campos ── */
-.campo-linha {
-  display: flex;
-  gap: 8pt;
-  margin-bottom: 5pt;
-  font-size: 10pt;
-}
-.campo-label {
-  font-weight: 700;
-  color: #374151;
-  white-space: nowrap;
-  min-width: 150pt;
-}
-.campo-valor {
-  color: #111;
-  flex: 1;
-  border-bottom: 0.5pt dotted #aaa;
-}
-
-/* ── Equipamento ── */
-.equip-box {
-  border: 1pt solid #1E3A8A;
-  border-radius: 4pt;
-  padding: 10pt 14pt;
-  margin-bottom: 12pt;
-  background: #f8faff;
-}
-.equip-box h3 {
-  font-size: 10pt;
-  font-weight: 700;
-  color: #1E3A8A;
-  text-transform: uppercase;
-  margin-bottom: 6pt;
-}
-.equip-dim {
-  display: flex;
-  gap: 24pt;
-  font-size: 10pt;
-  margin-top: 6pt;
-}
-.equip-dim span { font-weight: 700; }
-
+  // CSS exclusivo do RTE: a grade de fotos. O restante vem de documentoBase.
+  const cssFotos = `
 /* ── Fotos ── */
-.fotos-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12pt;
-  margin: 8pt 0;
+table.fotos {
+  width: 100%; border-collapse: collapse; margin-bottom: 5mm;
+  page-break-inside: avoid; break-inside: avoid;
 }
-.foto-box { text-align: center; }
-.foto-placeholder {
-  width: 100%;
-  height: 120pt;
-  background: #f3f4f6;
-  border: 1pt dashed #aaa;
-  border-radius: 4pt;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: 11pt;
-  color: #9ca3af;
+table.fotos td { width: 50%; vertical-align: top; padding: 0; }
+table.fotos td:first-child { padding-right: 3mm; }
+table.fotos td:last-child { padding-left: 3mm; }
+.foto-quadro {
+  /* Faixa de altura fixa (86mm) mantém as legendas alinhadas na linha e cabe
+     em duas linhas dentro da área útil (~250mm). A faixa é invisível: a borda
+     fica na imagem, então foto deitada não deixa moldura vazia em volta. */
+  height: 86mm;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+/* Sem object-fit/dimensões forçadas: a proporção original é preservada */
+.foto-quadro img {
+  max-width: 100%; max-height: 100%;
+  border: 0.5pt solid #cbd5e1; border-radius: 1mm;
 }
 .foto-legenda {
-  font-size: 8.5pt;
-  font-style: italic;
-  color: #555;
-  margin-top: 4pt;
-  text-align: center;
+  font-size: 8pt; font-style: italic; color: #6b7280; text-align: center;
+  margin-top: 1.8mm; padding-bottom: 1.2mm;
 }
+`;
 
-/* ── Garantia ── */
-.garantia-box {
-  background: #fff8f0;
-  border-left: 3pt solid #f59e0b;
-  padding: 10pt 14pt;
-  margin-bottom: 10pt;
-  font-size: 10.5pt;
-  line-height: 1.6;
-}
+  const conteudo = `
 
-/* ── Tabela de contatos ── */
-.tabela-contatos {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 10pt;
-  margin-top: 8pt;
-}
-.tabela-contatos th {
-  background: #1E3A8A;
-  color: #fff;
-  padding: 5pt 8pt;
-  text-align: left;
-  font-size: 9pt;
-}
-.tabela-contatos td {
-  padding: 5pt 8pt;
-  border-bottom: 0.5pt solid #e5e7eb;
-}
-
-/* ── Referência Proposta / Pedido ── */
-.ref-box {
-  border: 1pt solid #e5e7eb;
-  border-radius: 4pt;
-  padding: 12pt 16pt;
-  background: #fafafa;
-  font-size: 10pt;
-  line-height: 1.8;
-}
-
-/* ── Misc ── */
-.texto-justificado {
-  text-align: justify;
-  line-height: 1.6;
-  font-size: 10.5pt;
-}
-.page-break { page-break-after: always; }
-.page-break-inside-avoid { page-break-inside: avoid; }
-
-@media print {
-  .doc-header { display: block !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
-  .doc-header *, .doc-footer * { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
-  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
-  .footer-bar { background-color: #1a3a6b !important; color: #fff !important; }
-  .capa-banner { background-color: #1a3a6b !important; }
-  .capa-meta td:first-child { background-color: #1a3a6b !important; }
-  .secao-num { background-color: #1E3A8A !important; }
-  .tabela-contatos th { background-color: #1E3A8A !important; }
-}
-</style>
-</head>
-<body>
-
-<!-- Cabeçalho fixo -->
-<div class="doc-header">
-  <table class="header-table">
-    <tr>
-      <td rowspan="2" style="background-color:#1a3a6b; -webkit-print-color-adjust:exact; print-color-adjust:exact; color-adjust:exact; color:#ffffff; width:110px; text-align:center; padding:6px; vertical-align:middle;">
-        ${empresa?.logo
-          ? `<img src="${esc(empresa.logo)}" alt="Logo" style="max-height:42px;max-width:100%;object-fit:contain;filter:brightness(0) invert(1);" />`
-          : `<span style="color:white;font-weight:bold;font-size:9pt;text-align:center;display:block;">ENGEPLAR</span>`}
-      </td>
-      <td class="doc-title-cell" rowspan="2">
-        RELATÓRIO TÉCNICO DE EXECUÇÃO
-      </td>
-      <td style="font-size:8.5pt;font-weight:700;">Nº ${rteNum}</td>
-    </tr>
-    <tr>
-      <td style="font-size:8.5pt;">Data: ${hoje}</td>
-    </tr>
-  </table>
-</div>
-
-<!-- Rodapé fixo (repete em todas as páginas) -->
-<div class="doc-footer">
-  <div class="footer-id-line">
-    <span>${rteNum}</span>
-    <span>${nomeEmpresa}</span>
-  </div>
-  <div class="footer-bar">
-    <div class="footer-brand">
-      ${empresa?.logo ? `<img src="${esc(empresa.logo)}" alt="" />` : ''}
-      <span>${nomeEmpresa}</span>
-    </div>
-    <div class="footer-contacts">
-      <span>&#9990; ${esc(empresa?.telefone || '(47) 3386-0000')}</span>
-      <span>&#9993; ${esc(empresa?.email || 'contato@engeplar.com.br')}</span>
-      ${empresa?.site ? `<span>&#127760; ${esc(empresa.site)}</span>` : ''}
-    </div>
-  </div>
-</div>
-
-<div class="doc-content">
-
-  <!-- PÁGINA 1 — CAPA -->
-  <table style="width:100%; min-height:calc(297mm - 85px - 60px); border-collapse:collapse; page-break-after:always; table-layout:fixed;">
-    <tr>
-      <td style="width:12mm; background-color:#1a3a6b; -webkit-print-color-adjust:exact; print-color-adjust:exact; vertical-align:top;"></td>
-      <td style="vertical-align:top; padding:6mm 14mm 14mm 10mm;">
+        <!-- ── 1 · CAPA ── -->
         <div class="capa">
-          <div class="capa-banner">
-            ${empresa?.logo ? `<img src="${esc(empresa.logo)}" alt="Logo" />` : ''}
-            <div class="capa-banner-nome">${nomeEmpresa}</div>
-          </div>
-          <div class="capa-titulo">Relatório Técnico de Execução</div>
-          <div class="capa-subtitulo">${tipoLabel || esc(obra.nome || '')}</div>
-          <div class="capa-meta">
-            <table>
-              <tr><td>Nº RTE</td><td>${rteNum}</td></tr>
-              <tr><td>Contratante</td><td>${esc(obra.nome)}</td></tr>
-              <tr><td>Local</td><td>${esc(proposta?.clienteEndereco || obra.endereco || '')}</td></tr>
-              <tr><td>PTC Referência</td><td>${ptcRef}</td></tr>
-              <tr><td>Período</td><td>${periodoInicio} a ${periodoFim}</td></tr>
-              <tr><td>Data de Emissão</td><td>${hoje}</td></tr>
-            </table>
-          </div>
+          ${logoImg('logo-c', nomeEmpresa)}
+          <div class="capa-titulo">Relatório Técnico<br>de Execução</div>
+          <div class="capa-sub">${tipoLabel || esc(obra.nome || '')}</div>
+          <table class="capa-meta">
+            <tr><td class="rot">Nº RTE</td><td>${rteNum}</td></tr>
+            <tr><td class="rot">Contratante</td><td>${esc(obra.nome)}</td></tr>
+            <tr><td class="rot">Local</td><td>${local}</td></tr>
+            <tr><td class="rot">PTC Referência</td><td>${ptcRef}</td></tr>
+            <tr><td class="rot">Período de Execução</td><td>${periodoInicio} a ${periodoFim}</td></tr>
+            <tr><td class="rot">Data de Emissão</td><td>${hoje}</td></tr>
+          </table>
+          <div class="capa-emissao">${empresa?.endereco ? esc(empresa.endereco) + ' &middot; ' : ''}Emitido em ${hoje}</div>
         </div>
-      </td>
-    </tr>
-  </table>
 
-  <!-- PÁGINA 2 — AGRADECIMENTOS + INTRODUÇÃO -->
-  <table style="width:100%; min-height:calc(297mm - 85px - 60px); border-collapse:collapse; page-break-after:always; table-layout:fixed;">
-    <tr>
-      <td style="width:12mm; background-color:#1a3a6b; -webkit-print-color-adjust:exact; print-color-adjust:exact; vertical-align:top;"></td>
-      <td style="vertical-align:top; padding:6mm 14mm 14mm 10mm;">
-        ${secao(2, 'Agradecimentos', `
-          <p class="texto-justificado" style="margin-bottom:10pt;">
+        <!-- ── AGRADECIMENTOS ── -->
+        ${secao('Agradecimentos', `
+          <p class="texto-justificado">
             A <strong>${nomeEmpresa}</strong> agradece a confiança depositada e a oportunidade de
             realizar os serviços descritos neste relatório. Expressamos nossa gratidão aos responsáveis
             do contratante pelo acompanhamento e suporte durante toda a execução.
           </p>
           ${obra.responsavelCliente ? `
-          <table class="tabela-contatos" style="max-width:420pt;">
+          <table class="tabela-contatos" style="width:120mm;">
             <thead><tr><th>Responsável Contratante</th><th>Empresa / Unidade</th></tr></thead>
             <tbody>
               <tr><td>${esc(obra.responsavelCliente)}</td><td>${esc(obra.nome || '')}</td></tr>
             </tbody>
           </table>` : ''}`)}
-        ${secao(3, 'Introdução', `
-          <p class="texto-justificado" style="margin-bottom:12pt;">
+
+        <!-- ── INTRODUÇÃO ── -->
+        ${secao('Introdução', `
+          <p class="texto-justificado">
             O presente documento tem por finalidade apresentar os dados capturados na execução dos
-            trabalhos de <strong>${esc(obra.descricaoTecnica || tipoLabel || obra.nome || '')}</strong>.
+            trabalhos de <strong>${frase(obra.descricaoTecnica || tipoLabel || obra.nome || '')}</strong>.
           </p>
-          <p class="texto-justificado" style="margin-bottom:12pt;">
-            A execução do trabalho apontado ocorreu em <strong>${esc(proposta?.clienteEndereco || obra.endereco || '')}</strong>.
+          <p class="texto-justificado">
+            A execução do trabalho apontado ocorreu em <strong>${local}</strong>.
             ${obra.responsavelCliente ? `As atividades foram acompanhadas pelo(a) Sr(a). <strong>${esc(obra.responsavelCliente)}</strong>.` : ''}
           </p>
-          <div style="margin-top:8pt;">
+          <div style="margin-top:4mm;">
             ${campo('Proposta Técnica Comercial', ptcRef)}
             ${campo('Pedido Nº', esc(obra.pedidoNumero || '___________') + (obra.pedidoData ? `&nbsp;&nbsp;&nbsp;Data: ${fmt(obra.pedidoData)}` : ''))}
             ${campo('ART Nº', esc(obra.artNumero || '___________') + (obra.artData ? `&nbsp;&nbsp;&nbsp;Data: ${fmt(obra.artData)}` : ''))}
             ${campo('Nota Fiscal Nº', esc(obra.nfNumero || '___________') + (obra.nfData ? `&nbsp;&nbsp;&nbsp;Data: ${fmt(obra.nfData)}` : ''))}
             ${tecnicoNome ? campo('Técnico Responsável', `${tecnicoNome}${tecnicoCargo ? ' — ' + tecnicoCargo : ''}`) : ''}
           </div>`)}
-      </td>
-    </tr>
-  </table>
 
-  <!-- PÁGINA 3 — DESCRIÇÃO DA ATIVIDADE -->
-  <table style="width:100%; min-height:calc(297mm - 85px - 60px); border-collapse:collapse; page-break-after:always; table-layout:fixed;">
-    <tr>
-      <td style="width:12mm; background-color:#1a3a6b; -webkit-print-color-adjust:exact; print-color-adjust:exact; vertical-align:top;"></td>
-      <td style="vertical-align:top; padding:6mm 14mm 14mm 10mm;">
-        ${secao(4, 'Descrição da Atividade', `
-          <p class="texto-justificado" style="margin-bottom:12pt;">
+        <!-- ── DESCRIÇÃO DA ATIVIDADE ── -->
+        ${secao('Descrição da Atividade', `
+          <p class="texto-justificado">
             ${esc(obra.descricaoTecnica || `Execução de serviços de ${tipoLabel || 'intervenção técnica'} conforme Proposta Técnica Comercial ${ptcRef}.`)}
           </p>
           ${(obra.materialEquipamento || dim.diametro || dim.altura || dim.area) ? `
           <div class="equip-box">
             <h3>Dados do Equipamento</h3>
-            ${campo('Estrutura', esc(obra.materialEquipamento || ''))}
+            ${obra.materialEquipamento ? campo('Estrutura', esc(obra.materialEquipamento)) : ''}
             ${campo('Identificação', esc(obra.nome || ''))}
-            ${campo('Localização', esc(proposta?.clienteEndereco || obra.endereco || ''))}
+            ${local ? campo('Localização', local) : ''}
             ${(dim.diametro || dim.altura || dim.area) ? `
             <div class="equip-dim">
               ${dim.diametro ? `<div>Diâmetro: <span>${esc(dim.diametro)}</span></div>` : ''}
               ${dim.altura ? `<div>Altura: <span>${esc(dim.altura)}</span></div>` : ''}
-              ${dim.area ? `<div>Área: <span>${esc(dim.area)} m²</span></div>` : ''}
+              ${dim.area ? `<div>Área: <span>${esc(unid(dim.area, 'm²'))}</span></div>` : ''}
             </div>` : ''}
           </div>` : ''}
-          ${blocoTecnico ? `<div style="margin-top:12pt;">${blocoTecnico}</div>` : ''}`)}
-      </td>
-    </tr>
-  </table>
+          ${blocoTecnico}`, true)}
 
-  <!-- PÁGINA 4 — ESTRUTURA (condição anterior) -->
-  <table style="width:100%; min-height:calc(297mm - 85px - 60px); border-collapse:collapse; page-break-after:always; table-layout:fixed;">
-    <tr>
-      <td style="width:12mm; background-color:#1a3a6b; -webkit-print-color-adjust:exact; print-color-adjust:exact; vertical-align:top;"></td>
-      <td style="vertical-align:top; padding:6mm 14mm 14mm 10mm;">
-        ${secao(5, 'Estrutura — Condição Anterior à Intervenção', `
-          <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
-            Registro fotográfico das condições do equipamento antes do início dos serviços.
-          </p>
-          ${fotoPlaceholder('EST', 4)}`)}
-      </td>
-    </tr>
-  </table>
+        <!-- ── ESTRUTURA (condição anterior) — só com imagem anexada ── -->
+        ${fEstrutura.length ? secao('Estrutura — Condição Anterior à Intervenção', `
+          <p class="legenda-secao">Registro fotográfico das condições do equipamento antes do início dos serviços.</p>
+          ${galeria(fEstrutura)}`, true) : ''}
 
-  <!-- PÁGINA 5 — PROCEDIMENTO -->
-  <table style="width:100%; min-height:calc(297mm - 85px - 60px); border-collapse:collapse; page-break-after:always; table-layout:fixed;">
-    <tr>
-      <td style="width:12mm; background-color:#1a3a6b; -webkit-print-color-adjust:exact; print-color-adjust:exact; vertical-align:top;"></td>
-      <td style="vertical-align:top; padding:6mm 14mm 14mm 10mm;">
-        ${secao(6, 'Procedimento — Etapas de Execução', `
-          <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
-            Registro fotográfico das etapas de execução dos serviços.
-          </p>
-          ${cronograma.length > 0
-            ? cronograma.map((e, i) => `
-              <p style="font-weight:700;font-size:10pt;margin:10pt 0 6pt;color:#1E3A8A;">${i + 1}. ${esc(e.etapa)}</p>
-              ${fotoPlaceholder('PROC-' + (i + 1), 2)}`).join('')
-            : fotoPlaceholder('PROC', 4)}`)}
-      </td>
-    </tr>
-  </table>
+        <!-- ── PROCEDIMENTO — só etapas com imagem anexada ── -->
+        ${temProcedimento ? secao('Procedimento — Etapas de Execução', `
+          <p class="legenda-secao">Registro fotográfico das etapas de execução dos serviços.</p>
+          ${etapasComFoto.map(({ etapa, fotos: fs }, i) => `
+              <p class="etapa-titulo">${i + 1}. ${esc(etapa.etapa)}</p>
+              ${galeria(fs)}`).join('')}
+          ${galeria(fProcSolto)}`, true) : ''}
 
-  <!-- PÁGINA 6 — ENSAIOS + GARANTIA -->
-  <table style="width:100%; min-height:calc(297mm - 85px - 60px); border-collapse:collapse; page-break-after:always; table-layout:fixed;">
-    <tr>
-      <td style="width:12mm; background-color:#1a3a6b; -webkit-print-color-adjust:exact; print-color-adjust:exact; vertical-align:top;"></td>
-      <td style="vertical-align:top; padding:6mm 14mm 14mm 10mm;">
-        ${secao(7, 'Ensaios e Testes', `
-          <div style="margin-bottom:12pt;">${blocoEnsaio}</div>
-          ${fotoPlaceholder('ENS', 2)}`)}
-        ${secao(8, 'Garantia', `
+        <!-- ── ENSAIOS — texto sempre; imagens quando houver ── -->
+        ${secao('Ensaios e Testes', `
+          ${blocoEnsaio}
+          ${fEnsaios.length ? `<div style="margin-top:5mm;">${galeria(fEnsaios)}</div>` : ''}`, true)}
+
+        <!-- ── GARANTIA ── -->
+        ${secao('Garantia', `
           <div class="garantia-box">
-            <p style="margin-bottom:8pt;">
+            <p>
               Nossa intervenção deve atender e garantir os requisitos de desempenho do sistema aplicado por
-              <strong>${obra.garantiaMeses || 36} MESES</strong> a partir da data de emissão deste relatório.
+              <strong>${esc(String(obra.garantiaMeses || 36))} MESES</strong> a partir da data de emissão deste relatório.
             </p>
-            <p>Este equipamento deverá passar por inspeção periódica a cada <strong>${obra.inspecaoMeses || 12} MESES</strong>.</p>
+            <p>Este equipamento deverá passar por inspeção periódica a cada <strong>${esc(String(obra.inspecaoMeses || 12))} MESES</strong>.</p>
           </div>`)}
-      </td>
-    </tr>
-  </table>
 
-  <!-- PÁGINA 7 — IMAGENS FINAL + PEDIDO + PROPOSTA + CONTATOS -->
-  <table style="width:100%; min-height:calc(297mm - 85px - 60px); border-collapse:collapse; page-break-after:always; table-layout:fixed;">
-    <tr>
-      <td style="width:12mm; background-color:#1a3a6b; -webkit-print-color-adjust:exact; print-color-adjust:exact; vertical-align:top;"></td>
-      <td style="vertical-align:top; padding:6mm 14mm 14mm 10mm;">
-        ${secao(9, 'Imagens do Equipamento — Condição Final', `
-          <p style="font-size:9.5pt;color:#6b7280;font-style:italic;margin-bottom:8pt;">
-            Registro fotográfico do equipamento após a conclusão dos serviços.
-          </p>
-          ${fotoPlaceholder('FINAL', 4)}`)}
-        ${secao(10, 'Ordem de Compra / Pedido', `
+        <!-- ── IMAGENS FINAIS — só com imagem anexada ── -->
+        ${fFinal.length ? secao('Imagens do Equipamento — Condição Final', `
+          <p class="legenda-secao">Registro fotográfico do equipamento após a conclusão dos serviços.</p>
+          ${galeria(fFinal)}`, true) : ''}
+
+        <!-- ── PEDIDO ── -->
+        ${secao('Ordem de Compra / Pedido', `
           <div class="ref-box">
             ${campo('Pedido Nº', esc(obra.pedidoNumero || '___________________'))}
             ${campo('Data do Pedido', obra.pedidoData ? fmt(obra.pedidoData) : '___/___/______')}
             ${campo('Contratante', esc(obra.nome || ''))}
           </div>
-          <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
-            Cópia do documento de compra original disponível no arquivo da obra.
-          </p>`)}
-        ${secao(11, 'Proposta Técnica Comercial', `
+          ${nota('Cópia do documento de compra original disponível no arquivo da obra.')}`, true)}
+
+        <!-- ── PROPOSTA ── -->
+        ${secao('Proposta Técnica Comercial', `
           <div class="ref-box">
             ${campo('PTC Nº', ptcRef)}
             ${proposta?.nome ? campo('Descrição', esc(proposta.nome)) : ''}
           </div>
-          <p style="font-size:9pt;color:#6b7280;font-style:italic;margin-top:8pt;">
-            Proposta técnica comercial conforme arquivo aprovado pelo contratante.
-          </p>`)}
-        ${secao(12, 'Contatos e Corpo Técnico', `
+          ${nota('Proposta técnica comercial conforme arquivo aprovado pelo contratante.')}`)}
+
+        <!-- ── CONTATOS ── -->
+        ${secao('Contatos e Corpo Técnico', `
           <table class="tabela-contatos">
             <thead>
               <tr><th>Nome</th><th>Cargo</th><th>E-mail</th><th>Telefone</th></tr>
@@ -781,18 +394,28 @@ body {
             <tbody>
               <tr><td>John Clovis Peiker</td><td>Diretor Técnico</td><td>john@engeplar.com.br</td><td>(47) 9 8815-3943</td></tr>
               <tr><td>Edson James Peiker</td><td>Diretor</td><td>james@engeplar.com.br</td><td>(47) 9 8829-3476</td></tr>
-              <tr><td>Matheus Peiker</td><td>Gerente de Fábrica</td><td>matheus@engeplar.com.br</td><td>(47) 9 9637-0326</td></tr>
-              ${tecnicos.map(t => t.nome !== 'Matheus Peiker' ? `
-              <tr><td>${esc(t.nome)}</td><td>${esc(t.funcao || '')}</td><td>—</td><td>—</td></tr>` : '').join('')}
+              ${tecnicos.filter(t => !/matheus/i.test(t.nome || '')).map(t => `
+              <tr><td>${esc(t.nome)}</td><td>${esc(t.funcao || '')}</td><td>—</td><td>—</td></tr>`).join('')}
             </tbody>
           </table>`)}
-      </td>
-    </tr>
-  </table>
+`;
 
-</div>
-
-<script>window.onload = () => window.print();</script>
-</body>
-</html>`;
+  return documentoHTML({
+    title: rteNum,
+    cssExtra: cssFotos,
+    marcaAgua: marcaAguaHtml(empresa?.simbolo),
+    cabecalho: cabecalhoHtml({
+      logoHtml: logoImg('logo-h'),
+      titulo: 'Relatório Técnico de Execução',
+      metas: [`<strong>Nº ${rteNum}</strong>`, `Data: ${hoje}`],
+    }),
+    rodape: rodapeHtml({
+      idDoc: rteNum,
+      nomeEmpresa,
+      telefone: empresa?.telefone,
+      email: empresa?.email,
+      site: empresa?.site,
+    }),
+    conteudo,
+  });
 }

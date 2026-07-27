@@ -6,7 +6,8 @@ import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 import { gerarHTMLRTE } from '../templates/rteTemplate';
 import { gerarPTC } from '../lib/gerarPTC';
-import logoAsset from '../assets/logo.jpeg';
+import { resolverLogo, empresaParaImpressao } from '../lib/logo';
+import ModalFotosRelatorio from '../components/ModalFotosRelatorio';
 
 // Componentes fora do render para evitar remount e perda de foco nos inputs
 const RteRow = ({ children }) => (
@@ -62,10 +63,8 @@ export default function ObraDetalhes() {
     formatCurrency, empresa
   } = useAppContext();
 
-  const logoUrl = empresa.logo
-    ? (empresa.logo.startsWith('http') ? empresa.logo : `${window.location.origin}${empresa.logo}`)
-    : logoAsset;
-  const empresaComLogo = { ...empresa, logo: logoUrl };
+  // Logo absoluta: a janela de impressão é about:blank e não resolve caminhos relativos
+  const empresaComLogo = { ...empresa, logo: resolverLogo(empresa.logo) };
 
   const obra = obras.find(o => o.id === id);
   const [aba, setAba] = useState('resumo');
@@ -73,6 +72,10 @@ export default function ObraDetalhes() {
   const [descGasto, setDescGasto] = useState('');
   const [valorGasto, setValorGasto] = useState('');
   const [dataGasto, setDataGasto] = useState('');
+
+  // Imagens do RTE — anexadas na hora de gerar, não persistidas no banco
+  const [isFotosRteModal, setIsFotosRteModal] = useState(false);
+  const [fotosRte, setFotosRte] = useState({});
 
   // Finalizar obra
   const [isFinalizarModal, setIsFinalizarModal] = useState(false);
@@ -1160,9 +1163,26 @@ export default function ObraDetalhes() {
           }
         };
 
-        const gerarRTE = () => {
-          const html = gerarHTMLRTE(obra, empresaComLogo, cronograma, propostaPrincipal, equipeObra);
+        /* Seções fotográficas do RTE. Grupos sem imagem não são impressos —
+           por isso o anexo é pedido antes de gerar o documento. */
+        const gruposFotosRte = [
+          { id: 'estrutura', titulo: 'Estrutura — condição anterior à intervenção', dica: 'Fotos do equipamento antes do início dos serviços' },
+          ...(cronograma.length > 0
+            ? cronograma.map((e, i) => ({
+                id: `proc-${i}`,
+                titulo: `Procedimento — etapa ${i + 1}: ${e.etapa || 'sem nome'}`,
+                dica: 'Fotos da execução desta etapa',
+              }))
+            : [{ id: 'procedimento', titulo: 'Procedimento — etapas de execução', dica: 'Cadastre o cronograma para separar as fotos por etapa' }]),
+          { id: 'ensaios', titulo: 'Ensaios e testes', dica: 'Fotos dos ensaios e medições realizados' },
+          { id: 'final', titulo: 'Imagens do equipamento — condição final', dica: 'Fotos após a conclusão dos serviços' },
+        ];
+
+        const gerarRTE = async () => {
+          // Abre a janela no clique (evita bloqueio de pop-up) e só depois valida a logo
           const w = window.open('', '_blank');
+          const empresaImpressao = await empresaParaImpressao(empresa);
+          const html = gerarHTMLRTE(obra, empresaImpressao, cronograma, propostaPrincipal, equipeObra, fotosRte);
           if (w) { w.document.write(html); w.document.close(); }
         };
 
@@ -1173,12 +1193,26 @@ export default function ObraDetalhes() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ fontWeight: 700, fontSize: 16 }}>RTE — Relatório Técnico de Execução</h3>
-                <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>Preencha os campos abaixo e clique em Gerar RTE para exportar o PDF.</p>
+                <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
+                  Preencha os campos abaixo; ao gerar, o sistema pede as imagens de cada seção.
+                  Seções sem imagem não entram no documento.
+                </p>
               </div>
-              <button className="btn btn-primary" onClick={gerarRTE} style={{ whiteSpace: 'nowrap' }}>
+              <button className="btn btn-primary" onClick={() => setIsFotosRteModal(true)} style={{ whiteSpace: 'nowrap' }}>
                 <ClipboardList size={15} /> Gerar RTE (PDF)
               </button>
             </div>
+
+            <ModalFotosRelatorio
+              isOpen={isFotosRteModal}
+              onClose={() => setIsFotosRteModal(false)}
+              titulo="Imagens do RTE"
+              rotuloGerar="Gerar RTE (PDF)"
+              grupos={gruposFotosRte}
+              fotos={fotosRte}
+              setFotos={setFotosRte}
+              onGerar={() => { setIsFotosRteModal(false); gerarRTE(); }}
+            />
 
             {/* Bloco: Identificação */}
             <div className="card">

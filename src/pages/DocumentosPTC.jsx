@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { gerarHTMLPTC } from '../templates/ptcTemplate';
+import { empresaParaImpressao } from '../lib/logo';
+import { listarTiposServico, getTipoServico, REGIMES } from '../lib/ptcTemplates';
 
 const esc = (s) => s == null ? '' : String(s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -13,17 +15,6 @@ const STATUS = {
   rascunho: { label: 'Rascunho', color: 'var(--text-muted)',   bg: 'var(--background)' },
   emitido:  { label: 'Emitido',  color: 'var(--success)',      bg: 'rgba(16,185,129,0.1)' },
 };
-
-const TIPOS_SERVICO_PADRAO = [
-  { id: '_imp_prfv',     nome: 'Revestimento impermeabilizante com PRFV (liner éster vinílica Derakane)' },
-  { id: '_rev_tanque',   nome: 'Revestimento de tanques com liner éster vinílica' },
-  { id: '_rec_estrut',   nome: 'Recuperação de manifestações patológicas estruturais em concreto' },
-  { id: '_rev_uretano',  nome: 'Revestimento protetivo argamassado uretano' },
-  { id: '_pecas_prfv',   nome: 'Desenvolvimento de peças em fibra de vidro (PRFV)' },
-  { id: '_proj_material',nome: 'Revestimento com projeção de material' },
-  { id: '_polipropileno',nome: 'Revestimento com polipropileno (PP)' },
-  { id: '_manta',        nome: 'Impermeabilização com manta' },
-];
 
 function fmt(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v) || 0);
@@ -37,7 +28,7 @@ function calcTotal(ptc) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DocumentosPTC() {
-  const { ptcs, addPTC, updatePTC, deletePTC, tiposServico, obras, empresa, formatDate } = useAppContext();
+  const { ptcs, addPTC, updatePTC, deletePTC, obras, empresa, formatDate } = useAppContext();
   const [view, setView]           = useState('list');   // 'list' | 'form'
   const [currentId, setCurrentId] = useState(null);
   const [search, setSearch]       = useState('');
@@ -46,9 +37,7 @@ export default function DocumentosPTC() {
 
   const ptc = useMemo(() => ptcs.find(p => p.id === currentId) || null, [ptcs, currentId]);
 
-  const allTipos = [...(tiposServico || []), ...TIPOS_SERVICO_PADRAO.filter(
-    p => !(tiposServico || []).some(t => t.nome === p.nome)
-  )];
+  const tiposPtc = listarTiposServico();
 
   const filtered = ptcs.filter(p =>
     (p.numero_completo + ' ' + p.cliente_nome + ' ' + p.descricao_servico)
@@ -85,10 +74,11 @@ export default function DocumentosPTC() {
   };
 
   // ── Gerar PDF ───────────────────────────────────────────────
-  const handleGerarPDF = () => {
+  const handleGerarPDF = async () => {
     if (!ptc) return;
-    const html = gerarHTMLPTC(ptc, empresa);
+    // Abre a janela no clique (evita bloqueio de pop-up) e resolve a logo antes de escrever
     const win = window.open('', '_blank');
+    const html = gerarHTMLPTC(ptc, await empresaParaImpressao(empresa));
     if (win) { win.document.write(html); win.document.close(); }
   };
 
@@ -123,8 +113,7 @@ export default function DocumentosPTC() {
   // ── Helpers para JSONB arrays ───────────────────────────────
   const addSeqItem = () => {
     const seq = [...(ptc?.sequencia_execucao || [])];
-    const num = seq.length + 1;
-    seq.push({ numero: `4.${num}`, texto: '' });
+    seq.push({ etapa: '', texto: '' });
     set('sequencia_execucao', seq);
   };
 
@@ -137,7 +126,7 @@ export default function DocumentosPTC() {
   const removeSeq = (idx) => {
     const seq = [...(ptc?.sequencia_execucao || [])];
     seq.splice(idx, 1);
-    set('sequencia_execucao', seq.map((s, i) => ({ ...s, numero: `4.${i + 1}` })));
+    set('sequencia_execucao', seq);
   };
 
   const addMaterial = () => {
@@ -176,15 +165,41 @@ export default function DocumentosPTC() {
     set('itens_servicos', items);
   };
 
-  // ── Aplicar tipo de serviço ─────────────────────────────────
-  const aplicarTipoServico = (tipoId) => {
-    const tipo = [...(tiposServico || []), ...TIPOS_SERVICO_PADRAO].find(t => t.id === tipoId);
+  /* ── Tipo de serviço (biblioteca ptcTemplates) ───────────────
+     Define os blocos por tipo do documento: objetivo, sequência, garantia,
+     regime e itens sugeridos. Só preenche campos ainda vazios — o texto
+     digitado pelo usuário nunca é sobrescrito. Quando um campo fica vazio, o
+     próprio template usa o texto do tipo na hora de gerar o PDF. */
+  const aplicarTipoServico = (codigo) => {
+    set('tipo_servico_codigo', codigo);
+    const tipo = getTipoServico(codigo);
     if (!tipo) return;
-    if (tipo.texto_objetivo)   set('texto_objetivo',   tipo.texto_objetivo);
-    if (tipo.texto_observacoes) set('texto_observacoes', tipo.texto_observacoes);
-    if (tipo.sequencia_padrao && tipo.sequencia_padrao.length > 0)
-      set('sequencia_execucao', tipo.sequencia_padrao);
-    set('tipo_servico_id', tipoId);
+    if (!ptc.texto_objetivo && tipo.objetivo) set('texto_objetivo', tipo.objetivo);
+    if (!(ptc.sequencia_execucao?.length) && tipo.sequencia_execucao?.length) {
+      set('sequencia_execucao', tipo.sequencia_execucao.map(e => ({ etapa: e.etapa, texto: e.texto })));
+    }
+    if (!ptc.garantia_meses && tipo.garantia_meses) set('garantia_meses', tipo.garantia_meses);
+    if (!ptc.unidade_medida && tipo.unidade_padrao) {
+      set('unidade_medida', tipo.unidade_padrao === 'm2' ? 'm²' : tipo.unidade_padrao);
+    }
+    if (!ptc.regime_trabalho) set('regime_trabalho', REGIMES[tipo.regime]);
+  };
+
+  /** Sugere no orçamento os itens padrão do tipo (valor_ref é referência). */
+  const sugerirItensDoTipo = () => {
+    const tipo = getTipoServico(ptc.tipo_servico_codigo);
+    if (!tipo?.itens_catalogo?.length) return;
+    const atuais = [...(ptc?.itens_servicos || [])];
+    const novos = tipo.itens_catalogo
+      .filter(c => !atuais.some(a => a.descricao === c.descricao))
+      .map((c, i) => ({
+        item: String(atuais.length + i + 1),
+        descricao: c.descricao,
+        unidade: c.unidade === 'm2' ? 'm²' : c.unidade,
+        qtd: 1,
+        valor_unit: Number(c.valor_ref) || 0,
+      }));
+    if (novos.length > 0) set('itens_servicos', [...atuais, ...novos]);
   };
 
   if (view === 'list') return <ListView filtered={filtered} search={search} setSearch={setSearch} onNova={handleNova} onOpen={handleOpen} />;
@@ -270,13 +285,28 @@ export default function DocumentosPTC() {
             </Field>
           </Row2>
 
-          {/* Tipo de serviço */}
+          {/* Tipo de serviço — define os blocos técnicos do documento */}
           <Field label="Tipo de Serviço">
-            <select style={inp} value={ptc.tipo_servico_id || ''}
+            <select style={inp} value={ptc.tipo_servico_codigo || ''}
               onChange={e => aplicarTipoServico(e.target.value)}>
               <option value="">Selecionar tipo de serviço...</option>
-              {allTipos.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+              {tiposPtc.map(t => (
+                <option key={t.codigo} value={t.codigo}>
+                  {t.nome} — {REGIMES[t.regime] || t.regime}
+                </option>
+              ))}
             </select>
+            {ptc.tipo_servico_codigo && (() => {
+              const t = getTipoServico(ptc.tipo_servico_codigo);
+              if (!t) return null;
+              return (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+                  Regime: {REGIMES[t.regime]} · Garantia: {t.garantia_meses ? `${t.garantia_meses} meses` : 'não se aplica'}
+                  {t.usa_observacoes_rigido ? ' · inclui observações de norma (NBR 6118/9574/9575)' : ''}
+                  {t.refinar ? ' · template a refinar' : ''}
+                </p>
+              );
+            })()}
           </Field>
 
           {/* Obra vinculada */}
@@ -389,10 +419,14 @@ export default function DocumentosPTC() {
             </Field>
           </Row2>
 
-          <Divider label="4.0 Sequência de Execução" />
+          <Divider label="Sequência de Execução" />
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -8 }}>
+            Etapas do tipo de serviço. Deixe vazio para o documento usar a sequência padrão do tipo.
+          </p>
           {(ptc.sequencia_execucao || []).map((s, i) => (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input style={{ ...inp, width: 70 }} value={s.numero || ''} onChange={e => updateSeq(i, 'numero', e.target.value)} />
+              <input style={{ ...inp, width: 150 }} value={s.etapa || s.numero || ''}
+                onChange={e => updateSeq(i, 'etapa', e.target.value)} placeholder="Etapa (ex: LIMPEZA)" />
               <input style={{ ...inp, flex: 1 }} value={s.texto || ''} onChange={e => updateSeq(i, 'texto', e.target.value)}
                 placeholder="Descrição da etapa..." />
               <button onClick={() => removeSeq(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}>
@@ -436,6 +470,12 @@ export default function DocumentosPTC() {
       {/* TAB: Preços */}
       {activeTab === 'precos' && (
         <div className="card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {ptc.tipo_servico_codigo && (
+            <button className="btn btn-secondary" onClick={sugerirItensDoTipo} style={{ alignSelf: 'flex-start' }}>
+              <Plus size={14} /> Sugerir itens do tipo de serviço
+            </button>
+          )}
 
           <Divider label="Materiais" />
           {(ptc.itens_materiais || []).map((item, i) => (
@@ -514,11 +554,11 @@ export default function DocumentosPTC() {
           <Row2>
             <Field label="Nome do Responsável pela Proposta">
               <input style={inp} value={ptc.responsavel_nome || ''} onChange={e => set('responsavel_nome', e.target.value)}
-                placeholder="Ex: Matheus Peiker" />
+                placeholder="Ex: John C. Peiker" />
             </Field>
             <Field label="Cargo">
               <input style={inp} value={ptc.responsavel_cargo || ''} onChange={e => set('responsavel_cargo', e.target.value)}
-                placeholder="Ex: Gerente de fábrica" />
+                placeholder="Ex: Diretor Técnico" />
             </Field>
           </Row2>
 
@@ -567,8 +607,8 @@ export default function DocumentosPTC() {
             </p>
             <div style={{ display: 'inline-block', textAlign: 'center' }}>
               <div style={{ width: 260, borderTop: '1px solid var(--text-secondary)', paddingTop: 8 }}>
-                <p style={{ fontWeight: 600 }}>{ptc.responsavel_nome || 'Matheus Peiker'}</p>
-                <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ptc.responsavel_cargo || 'Gerente de fábrica'}</p>
+                <p style={{ fontWeight: 600 }}>{ptc.responsavel_nome || 'John C. Peiker'}</p>
+                <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ptc.responsavel_cargo || 'Diretor Técnico'}</p>
               </div>
             </div>
           </div>
