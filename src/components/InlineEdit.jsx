@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export default function InlineEdit({ value, onSave, type = 'text', options = [], prefix = '', suffix = '', placeholder = 'Clique para editar', className = '' }) {
   const [editing, setEditing] = useState(false);

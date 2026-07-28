@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, HardHat, FileText, Wallet, ShoppingCart, BarChart3, Users, Menu, Bell, Search, Settings, LogOut, Check, Calendar, FolderOpen, History, ClipboardList, Contact2, BookMarked, Microscope } from 'lucide-react';
+import { LayoutDashboard, HardHat, FileText, Wallet, ShoppingCart, BarChart3, Users, Menu, Bell, Search, Settings, LogOut, Check, History, Contact2, BookMarked, Microscope } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import logoImg from '../../assets/logo.jpeg';
 import Modal from '../Modal';
@@ -12,14 +12,12 @@ const navItems = [
   { icon: Wallet, label: 'Financeiro', path: '/financeiro' },
   { icon: Users, label: 'Equipe', path: '/funcionarios' },
   { icon: Contact2, label: 'Contatos', path: '/contatos' },
-  { icon: ClipboardList, label: 'Orçamentos', path: '/orcamentos' },
-  { icon: FileText, label: 'Proposta', path: '/proposta' },
+  { icon: BookMarked, label: 'PTCs', path: '/ptc' },
   { icon: ShoppingCart, label: 'Compras', path: '/compras' },
   { icon: FileText, label: 'Catálogo', path: '/catalogo' },
   { icon: BarChart3, label: 'Relatórios', path: '/relatorios' },
   { icon: History, label: 'Histórico', path: '/historico' },
-  { icon: BookMarked, label: 'PTCs', path: '/ptc', divider: true },
-  { icon: Microscope, label: 'RVTs', path: '/rvt' },
+  { icon: Microscope, label: 'RVTs', path: '/rvt', divider: true },
 ];
 
 export default function AppLayout() {
@@ -28,7 +26,7 @@ export default function AppLayout() {
 
   useEffect(() => { setIsMobileMenuOpen(false); }, [location.pathname]);
 
-  const { notificacoes, marcarComoLida, getNotificacoesNaoLidas, obras, funcionarios, historico, empresa, listaOrcamentos, propostas, clientes, fornecedores, user, logout } = useAppContext();
+  const { notificacoes, marcarComoLida, getNotificacoesNaoLidas, obras, funcionarios, historico, empresa, ptcs, clientes, fornecedores, user, logout } = useAppContext();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -37,8 +35,10 @@ export default function AppLayout() {
 
   const filteredObras = obras.filter(o => o.nome.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredFunc = funcionarios.filter(f => f.nome.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredOrcamentos = listaOrcamentos.filter(o => o.nome.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredPropostas = propostas.filter(p => p.nome.toLowerCase().includes(searchTerm.toLowerCase()) || p.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredPtcs = ptcs.filter(p =>
+    `${p.numero_completo || ''} ${p.cliente_nome || ''} ${p.descricao_servico || ''}`
+      .toLowerCase().includes(searchTerm.toLowerCase())
+  );
   const filteredClientes = clientes.filter(c => c.nome.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredFornecedores = fornecedores.filter(f => f.nome.toLowerCase().includes(searchTerm.toLowerCase()));
   
@@ -198,21 +198,12 @@ export default function AppLayout() {
               </div>
             ))}
 
-            {/* Orçamentos */}
-            {filteredOrcamentos.length > 0 && <h4 style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8, marginTop: 16 }}>Orçamentos</h4>}
-            {filteredOrcamentos.map(o => (
-              <div key={`orc-${o.id}`} className="card hover-effect mb-2" style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setIsSearchOpen(false); navigate('/orcamentos'); }}>
-                <p style={{ fontWeight: 600, fontSize: 14 }}>{o.nome}</p>
-                <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{o.itens.length} itens cadastrados</p>
-              </div>
-            ))}
-
-            {/* Propostas */}
-            {filteredPropostas.length > 0 && <h4 style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8, marginTop: 16 }}>Propostas</h4>}
-            {filteredPropostas.map(p => (
-              <div key={`prop-${p.id}`} className="card hover-effect mb-2" style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setIsSearchOpen(false); navigate('/proposta'); }}>
-                <p style={{ fontWeight: 600, fontSize: 14 }}>{p.nome}</p>
-                <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Cliente: {p.clienteNome}</p>
+            {/* PTCs */}
+            {filteredPtcs.length > 0 && <h4 style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8, marginTop: 16 }}>PTCs</h4>}
+            {filteredPtcs.map(p => (
+              <div key={`ptc-${p.id}`} className="card hover-effect mb-2" style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setIsSearchOpen(false); navigate('/ptc'); }}>
+                <p style={{ fontWeight: 600, fontSize: 14 }}>{p.numero_completo || 'PTC sem número'}</p>
+                <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{p.cliente_nome || 'Cliente não informado'}</p>
               </div>
             ))}
 
@@ -240,7 +231,7 @@ export default function AppLayout() {
               </div>
             ))}
 
-            {filteredObras.length === 0 && filteredFunc.length === 0 && filteredOrcamentos.length === 0 && filteredPropostas.length === 0 && filteredClientes.length === 0 && filteredFornecedores.length === 0 && filteredGastos.length === 0 && (
+            {filteredObras.length === 0 && filteredFunc.length === 0 && filteredPtcs.length === 0 && filteredClientes.length === 0 && filteredFornecedores.length === 0 && filteredGastos.length === 0 && (
               <p className="text-muted" style={{ textAlign: 'center', marginTop: 16 }}>Nenhum resultado encontrado para "{searchTerm}"</p>
             )}
           </div>

@@ -1,15 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  FilePlus, FileText, Search, ChevronLeft, Trash2, Eye, Save,
-  Plus, Minus, Copy, CheckCircle, Clock, Edit3, Download
+  FilePlus, FileText, Search, ChevronLeft, Trash2, Eye,
+  Plus, Minus, Building2
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { gerarHTMLPTC } from '../templates/ptcTemplate';
 import { empresaParaImpressao } from '../lib/logo';
 import { listarTiposServico, getTipoServico, REGIMES } from '../lib/ptcTemplates';
-
-const esc = (s) => s == null ? '' : String(s)
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+import { calcTotalPTC } from '../lib/ptcTotais';
 
 const STATUS = {
   rascunho: { label: 'Rascunho', color: 'var(--text-muted)',   bg: 'var(--background)' },
@@ -20,27 +19,28 @@ function fmt(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v) || 0);
 }
 
-function calcTotal(ptc) {
-  const mat = (ptc.itens_materiais || []).reduce((a, i) => a + (Number(i.qtd)||0)*(Number(i.valor_unit)||0), 0);
-  const srv = (ptc.itens_servicos  || []).reduce((a, i) => a + (Number(i.qtd)||0)*(Number(i.valor_unit)||0), 0);
-  return mat + srv + (Number(ptc.frete_valor) || 0);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DocumentosPTC() {
-  const { ptcs, addPTC, updatePTC, deletePTC, obras, empresa, formatDate } = useAppContext();
+  const {
+    ptcs, addPTC, updatePTC, updatePTCFields, deletePTC,
+    obras, addObra, clientes, addCliente, empresa,
+  } = useAppContext();
+  const navigate = useNavigate();
   const [view, setView]           = useState('list');   // 'list' | 'form'
   const [currentId, setCurrentId] = useState(null);
   const [search, setSearch]       = useState('');
   const [activeTab, setActiveTab] = useState('identificacao');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isBuscandoCnpj, setIsBuscandoCnpj] = useState(false);
+  const [erroCnpj, setErroCnpj] = useState('');
+  const [gerandoObra, setGerandoObra] = useState(false);
 
   const ptc = useMemo(() => ptcs.find(p => p.id === currentId) || null, [ptcs, currentId]);
 
   const tiposPtc = listarTiposServico();
 
   const filtered = ptcs.filter(p =>
-    (p.numero_completo + ' ' + p.cliente_nome + ' ' + p.descricao_servico)
+    `${p.numero_completo || ''} ${p.cliente_nome || ''} ${p.descricao_servico || ''}`
       .toLowerCase().includes(search.toLowerCase())
   );
 
@@ -108,6 +108,108 @@ export default function DocumentosPTC() {
     set('numero', seq);
     set('numero_completo', numCompleto);
     set('data_emissao', hoje.toISOString().split('T')[0]);
+  };
+
+  /* ── Busca por CNPJ ──────────────────────────────────────────
+     Ao completar os 14 dígitos, os dados do cliente vêm da BrasilAPI e caem
+     de uma vez nos campos (um único UPDATE, sem corrida entre chamadas).
+     Nada fica travado: todo campo continua editável depois. */
+  const cnpjBuscado = useRef('');
+
+  const formatarFone = (bruto) => {
+    const d = String(bruto || '').replace(/\D/g, '');
+    if (d.length < 10) return String(bruto || '').trim();
+    const ddd = d.slice(0, 2);
+    const resto = d.slice(2);
+    return resto.length > 8
+      ? `(${ddd}) ${resto.slice(0, 5)}-${resto.slice(5)}`
+      : `(${ddd}) ${resto.slice(0, 4)}-${resto.slice(4)}`;
+  };
+
+  const formatarCnpj = (bruto) => {
+    const d = String(bruto || '').replace(/\D/g, '').slice(0, 14);
+    if (d.length !== 14) return bruto;
+    return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+  };
+
+  const buscarCnpj = async (valorCnpj) => {
+    const limpo = String(valorCnpj || '').replace(/\D/g, '');
+    if (limpo.length !== 14) { setErroCnpj('Informe os 14 dígitos do CNPJ.'); return; }
+    cnpjBuscado.current = limpo;
+    setErroCnpj('');
+    setIsBuscandoCnpj(true);
+    try {
+      const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${limpo}`);
+      if (!resp.ok) throw new Error('CNPJ não encontrado na base da Receita.');
+      const d = await resp.json();
+
+      const endereco = [
+        [d.logradouro, d.numero].filter(Boolean).join(', '),
+        (d.complemento || '').trim(),
+        d.bairro,
+      ].filter(Boolean).join(' - ');
+      const razao = d.razao_social || d.nome_fantasia || '';
+      const fone  = formatarFone(d.ddd_telefone_1);
+      const email = (d.email || '').toLowerCase();
+
+      // Só sobrescreve o que a Receita realmente devolveu.
+      const patch = { cliente_cnpj: formatarCnpj(limpo) };
+      if (razao)      patch.cliente_nome     = razao;
+      if (endereco)   patch.cliente_endereco = endereco;
+      if (d.municipio) patch.cliente_cidade  = d.municipio;
+      if (d.uf)       patch.cliente_estado   = d.uf;
+      if (fone)       patch.cliente_fone     = fone;
+      if (email)      patch.cliente_email    = email;
+      await updatePTCFields(currentId, patch);
+
+      // Cadastra em Contatos quando o cliente ainda não existe por lá.
+      const jaExiste = clientes.some(c => (c.cnpj || '').replace(/\D/g, '') === limpo);
+      if (!jaExiste && razao) {
+        addCliente({
+          nome: razao, cnpj: formatarCnpj(limpo),
+          endereco: [endereco, d.municipio, d.uf].filter(Boolean).join(' - '),
+          tipo: 'PJ', telefone: fone, email,
+        });
+      }
+    } catch (err) {
+      setErroCnpj(err.message || 'Não foi possível consultar o CNPJ.');
+    } finally {
+      setIsBuscandoCnpj(false);
+    }
+  };
+
+  /* Dispara sozinho assim que o 14º dígito entra; o mesmo CNPJ não é
+     consultado duas vezes seguidas. */
+  const handleCnpjChange = (valor) => {
+    set('cliente_cnpj', valor);
+    const limpo = valor.replace(/\D/g, '');
+    if (limpo.length === 14 && limpo !== cnpjBuscado.current) buscarCnpj(valor);
+    if (limpo.length !== 14) { cnpjBuscado.current = ''; setErroCnpj(''); }
+  };
+
+  /* ── Gerar obra a partir da PTC ──────────────────────────────
+     Fechado o negócio, a PTC vira obra: nome, endereço e orçamento saem do
+     documento e o vínculo fica gravado em obra_id. */
+  const handleGerarObra = async () => {
+    if (!ptc || ptc.obra_id || gerandoObra) return;
+    const nome = (ptc.descricao_servico || '').trim()
+      || (ptc.cliente_nome || '').trim()
+      || ptc.numero_completo
+      || 'Obra sem nome';
+    if (!window.confirm(`Criar a obra "${nome}" a partir desta PTC?`)) return;
+    setGerandoObra(true);
+    const endereco = [ptc.cliente_endereco, ptc.cliente_cidade, ptc.cliente_estado]
+      .filter(Boolean).join(' - ');
+    const obraId = await addObra({
+      nome,
+      endereco,
+      status: 'Em andamento',
+      previsao: '',
+      orcamento: calcTotalPTC(ptc) - (Number(ptc.desconto_valor) || 0),
+    });
+    if (obraId) await updatePTCFields(currentId, { obra_id: obraId });
+    else window.alert('Não foi possível criar a obra. Tente novamente.');
+    setGerandoObra(false);
   };
 
   // ── Helpers para JSONB arrays ───────────────────────────────
@@ -209,7 +311,8 @@ export default function DocumentosPTC() {
   const tabs = ['identificacao','conteudo','precos','assinatura'];
   const tabLabels = { identificacao: 'Identificação', conteudo: 'Conteúdo', precos: 'Preços', assinatura: 'Assinatura' };
 
-  const totalGeral = calcTotal(ptc);
+  const totalGeral = calcTotalPTC(ptc);
+  const obraDaPtc  = ptc.obra_id ? obras.find(o => o.id === ptc.obra_id) : null;
 
   return (
     <div style={{ maxWidth: 920, margin: '0 auto' }}>
@@ -242,6 +345,27 @@ export default function DocumentosPTC() {
           </button>
         </div>
       </div>
+
+      {/* Gerar obra — a PTC fechada vira obra, com nome, endereço e valor daqui */}
+      {obraDaPtc ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          padding: '10px 16px', marginBottom: 20, borderRadius: 8, flexWrap: 'wrap',
+          background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)'
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--success)' }}>
+            Obra gerada: {obraDaPtc.nome}
+          </span>
+          <button className="btn btn-sm" onClick={() => navigate(`/obras/${obraDaPtc.id}`)}>
+            Abrir obra
+          </button>
+        </div>
+      ) : (
+        <button className="btn btn-primary" onClick={handleGerarObra} disabled={gerandoObra}
+          style={{ width: '100%', marginBottom: 20, justifyContent: 'center' }}>
+          <Building2 size={16} /> {gerandoObra ? 'Criando obra...' : 'Gerar Obra a partir desta PTC'}
+        </button>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
@@ -320,20 +444,31 @@ export default function DocumentosPTC() {
 
           <Divider label="Cliente" />
 
-          <Row2>
-            <Field label="Razão Social / Nome do Cliente">
-              <input style={inp} value={ptc.cliente_nome || ''} onChange={e => set('cliente_nome', e.target.value)} />
-            </Field>
-            <Field label="CNPJ">
-              <input style={inp} value={ptc.cliente_cnpj || ''} onChange={e => set('cliente_cnpj', e.target.value)} />
-            </Field>
-          </Row2>
+          {/* CNPJ primeiro: preencher aqui traz o resto dos dados prontos */}
+          <Field label="CNPJ">
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input style={{ ...inp, flex: 1 }} value={ptc.cliente_cnpj || ''}
+                onChange={e => handleCnpjChange(e.target.value)}
+                placeholder="00.000.000/0001-00" />
+              <button className="btn" onClick={() => buscarCnpj(ptc.cliente_cnpj)} disabled={isBuscandoCnpj}
+                style={{ background: 'var(--primary-light)', color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                <Search size={14} /> {isBuscandoCnpj ? 'Buscando...' : 'Buscar'}
+              </button>
+            </div>
+            <p style={{ fontSize: 12, marginTop: 6, color: erroCnpj ? 'var(--danger)' : 'var(--text-muted)' }}>
+              {erroCnpj || 'Os dados do cliente são preenchidos automaticamente e podem ser alterados.'}
+            </p>
+          </Field>
+
+          <Field label="Razão Social / Nome do Cliente">
+            <input style={inp} value={ptc.cliente_nome || ''} onChange={e => set('cliente_nome', e.target.value)} />
+          </Field>
           <Field label="Unidade / Obra">
             <input style={inp} value={ptc.cliente_unidade || ''} onChange={e => set('cliente_unidade', e.target.value)}
               placeholder="Ex: COAMO Cândido de Abreu" />
           </Field>
           <Field label="Endereço Completo">
-            <input style={inp} value={ptc.cliente_endereco || ''} onChange={e => set('cliente_endereco', e.target.value)} />
+            <AutoTextarea style={inp} value={ptc.cliente_endereco} onChange={e => set('cliente_endereco', e.target.value)} />
           </Field>
           <Row2>
             <Field label="Cidade">
@@ -358,16 +493,18 @@ export default function DocumentosPTC() {
           <Divider label="Capa" />
 
           <Field label="Descrição do Serviço (título em destaque na capa)">
-            <textarea style={{ ...inp, minHeight: 56 }} value={ptc.descricao_servico || ''}
+            <AutoTextarea style={inp} value={ptc.descricao_servico}
               onChange={e => set('descricao_servico', e.target.value)}
               placeholder="Ex: RECUPERAÇÃO DAS MANIFESTAÇÕES PATOLÓGICAS ESTRUTURAIS" />
           </Field>
           <Field label="Subtítulo (linha abaixo do título)">
-            <input style={inp} value={ptc.subtitulo_servico || ''} onChange={e => set('subtitulo_servico', e.target.value)}
+            <AutoTextarea style={inp} value={ptc.subtitulo_servico}
+              onChange={e => set('subtitulo_servico', e.target.value)}
               placeholder="Ex: REVESTIMENTO PROTETIVO ARGAMASSADO URETANO COM 12mm ESPESSURA MÉDIA" />
           </Field>
           <Field label="Área Total">
-            <input style={inp} value={ptc.area_total || ''} onChange={e => set('area_total', e.target.value)}
+            <AutoTextarea style={inp} minRows={1} value={ptc.area_total}
+              onChange={e => set('area_total', e.target.value)}
               placeholder="Ex: Área superior: 96,00m²" />
           </Field>
 
@@ -402,7 +539,7 @@ export default function DocumentosPTC() {
 
           <Divider label="1.0 Objetivo" />
           <Field label="Texto do Objetivo (seção 1.1)">
-            <textarea style={{ ...inp, minHeight: 90 }} value={ptc.texto_objetivo || ''}
+            <AutoTextarea style={inp} minRows={4} value={ptc.texto_objetivo}
               onChange={e => set('texto_objetivo', e.target.value)}
               placeholder="Em atendimento a vossa solicitação e oportunidade..." />
           </Field>
@@ -424,12 +561,12 @@ export default function DocumentosPTC() {
             Etapas do tipo de serviço. Deixe vazio para o documento usar a sequência padrão do tipo.
           </p>
           {(ptc.sequencia_execucao || []).map((s, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input style={{ ...inp, width: 150 }} value={s.etapa || s.numero || ''}
+            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <AutoTextarea style={{ ...inp, width: 150 }} minRows={1} value={s.etapa || s.numero}
                 onChange={e => updateSeq(i, 'etapa', e.target.value)} placeholder="Etapa (ex: LIMPEZA)" />
-              <input style={{ ...inp, flex: 1 }} value={s.texto || ''} onChange={e => updateSeq(i, 'texto', e.target.value)}
+              <AutoTextarea style={{ ...inp, flex: 1 }} value={s.texto} onChange={e => updateSeq(i, 'texto', e.target.value)}
                 placeholder="Descrição da etapa..." />
-              <button onClick={() => removeSeq(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}>
+              <button onClick={() => removeSeq(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', marginTop: 8 }}>
                 <Minus size={15} />
               </button>
             </div>
@@ -460,7 +597,7 @@ export default function DocumentosPTC() {
 
           <Divider label="9.0 Observações Importantes" />
           <Field label="Texto de observações técnicas">
-            <textarea style={{ ...inp, minHeight: 90 }} value={ptc.texto_observacoes || ''}
+            <AutoTextarea style={inp} minRows={4} value={ptc.texto_observacoes}
               onChange={e => set('texto_observacoes', e.target.value)}
               placeholder="Por se tratar de um sistema de proteção..." />
           </Field>
@@ -479,16 +616,16 @@ export default function DocumentosPTC() {
 
           <Divider label="Materiais" />
           {(ptc.itens_materiais || []).map((item, i) => (
-            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <input style={{ ...inp, width: 50 }} value={item.item || ''} onChange={e => updateMat(i, 'item', e.target.value)} placeholder="#" />
-              <input style={{ ...inp, flex: 2, minWidth: 180 }} value={item.descricao || ''} onChange={e => updateMat(i, 'descricao', e.target.value)} placeholder="Descrição" />
+              <AutoTextarea style={{ ...inp, flex: 2, minWidth: 180 }} minRows={1} value={item.descricao} onChange={e => updateMat(i, 'descricao', e.target.value)} placeholder="Descrição" />
               <input style={{ ...inp, width: 70 }} value={item.unidade || ''} onChange={e => updateMat(i, 'unidade', e.target.value)} placeholder="Un." />
               <input type="number" style={{ ...inp, width: 90 }} value={item.qtd || ''} onChange={e => updateMat(i, 'qtd', e.target.value)} placeholder="Qtd" />
               <input type="number" style={{ ...inp, width: 110 }} value={item.valor_unit || ''} onChange={e => updateMat(i, 'valor_unit', e.target.value)} placeholder="Valor unit." />
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 90, textAlign: 'right' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 90, textAlign: 'right', marginTop: 9 }}>
                 {fmt((Number(item.qtd)||0) * (Number(item.valor_unit)||0))}
               </span>
-              <button onClick={() => removeMat(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}>
+              <button onClick={() => removeMat(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', marginTop: 8 }}>
                 <Minus size={14} />
               </button>
             </div>
@@ -499,16 +636,16 @@ export default function DocumentosPTC() {
 
           <Divider label="Serviços" />
           {(ptc.itens_servicos || []).map((item, i) => (
-            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <input style={{ ...inp, width: 50 }} value={item.item || ''} onChange={e => updateSrv(i, 'item', e.target.value)} placeholder="#" />
-              <input style={{ ...inp, flex: 2, minWidth: 180 }} value={item.descricao || ''} onChange={e => updateSrv(i, 'descricao', e.target.value)} placeholder="Descrição" />
+              <AutoTextarea style={{ ...inp, flex: 2, minWidth: 180 }} minRows={1} value={item.descricao} onChange={e => updateSrv(i, 'descricao', e.target.value)} placeholder="Descrição" />
               <input style={{ ...inp, width: 70 }} value={item.unidade || ''} onChange={e => updateSrv(i, 'unidade', e.target.value)} placeholder="Un." />
               <input type="number" style={{ ...inp, width: 90 }} value={item.qtd || ''} onChange={e => updateSrv(i, 'qtd', e.target.value)} placeholder="Qtd" />
               <input type="number" style={{ ...inp, width: 110 }} value={item.valor_unit || ''} onChange={e => updateSrv(i, 'valor_unit', e.target.value)} placeholder="Valor unit." />
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 90, textAlign: 'right' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 90, textAlign: 'right', marginTop: 9 }}>
                 {fmt((Number(item.qtd)||0) * (Number(item.valor_unit)||0))}
               </span>
-              <button onClick={() => removeSrv(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}>
+              <button onClick={() => removeSrv(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', marginTop: 8 }}>
                 <Minus size={14} />
               </button>
             </div>
@@ -587,7 +724,7 @@ export default function DocumentosPTC() {
                 const revs = [...(ptc.revisoes || [])]; revs[i] = { ...revs[i], solicitante: e.target.value }; set('revisoes', revs);
               }} placeholder="Solicitante" />
               <button onClick={() => { const revs = [...(ptc.revisoes || [])]; revs.splice(i, 1); set('revisoes', revs); }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}>
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', marginTop: 8 }}>
                 <Minus size={14} />
               </button>
             </div>
@@ -675,7 +812,7 @@ function ListView({ filtered, search, setSearch, onNova, onOpen }) {
                   {STATUS[p.status]?.label || p.status}
                 </span>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {fmt(calcTotal(p))}
+                  {fmt(calcTotalPTC(p))}
                 </span>
               </div>
             </div>
@@ -693,6 +830,30 @@ const inp = {
   color: 'var(--text-primary)', fontSize: 13, outline: 'none',
 };
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase' };
+
+/* Caixa de texto que cresce junto com o conteúdo. Os textos da PTC (objetivo,
+   observações, descrição das etapas e dos itens) são longos e precisam ser
+   lidos por inteiro, sem rolagem dentro do campo. */
+function AutoTextarea({ value, onChange, minRows = 2, style, ...rest }) {
+  const ref = useRef(null);
+  const ajustar = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  useEffect(ajustar, [value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={minRows}
+      value={value ?? ''}
+      onChange={onChange}
+      style={{ ...style, resize: 'none', overflow: 'hidden', lineHeight: 1.5 }}
+      {...rest}
+    />
+  );
+}
 
 function Field({ label, children }) {
   return (

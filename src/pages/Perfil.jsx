@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Building2, Users, Mail, Phone, MapPin, Globe, Contact2, Search } from 'lucide-react';
 import InlineEdit from '../components/InlineEdit';

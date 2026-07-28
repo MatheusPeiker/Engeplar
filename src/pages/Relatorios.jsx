@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Download, Filter, TrendingUp, TrendingDown } from 'lucide-react';
+import { Download, Filter } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { receitaPTC } from '../lib/ptcTotais';
 
 const COLORS = ['#1E3A8A', '#F59E0B', '#EF4444', '#10B981', '#8b5cf6', '#06b6d4'];
 
 export default function Relatorios() {
-  const { obras, funcionarios, calcProgressoFinanceiro, cronogramas, getTotalOrcamento, getPropostaObra, historico, registrosDesempenho, getTopClientes, getTopFornecedores, formatCurrency } = useAppContext();
+  const { obras, funcionarios, calcProgressoFinanceiro, ptcs, historico, registrosDesempenho, getTopClientes, getTopFornecedores, formatCurrency } = useAppContext();
   const [visorModo, setVisorModo] = useState('Geral');
 
   const topClientes = getTopClientes();
@@ -20,18 +21,16 @@ export default function Relatorios() {
   const custoMat = obras.reduce((a, o) => a + calcProgressoFinanceiro(o).gasto, 0);
   const dataDespesas = [{ name: 'Mão de Obra', value: custoFunc || 1 }, { name: 'Materiais', value: custoMat || 1 }];
 
+  /* Receita = soma das PTCs vinculadas à obra; custo = gasto já realizado.
+     Sem PTC vinculada, o orçamento da obra serve de valor previsto. */
   const dataLucro = obras.map(o => {
-    const custo = getTotalOrcamento(o.id);
-    const propList = getPropostaObra(o.id);
-    const prop = propList[0] || null;
-    const margem = prop?.margemLucro || 20;
-    const valorProposto = prop?.valorProposto || custo * (1 + margem / 100);
-    return { name: o.nome.substring(0, 15), custo, proposto: valorProposto, lucro: valorProposto - custo };
+    const custo = calcProgressoFinanceiro(o).gasto;
+    const ptcsObra = ptcs.filter(p => p.obra_id === o.id);
+    const proposto = ptcsObra.length > 0
+      ? ptcsObra.reduce((a, p) => a + receitaPTC(p), 0)
+      : (o.orcamento || 0);
+    return { name: o.nome.substring(0, 15), custo, proposto, lucro: proposto - custo };
   });
-
-  const desempenhoStats = { 'Excelente': 0, 'Bom': 0, 'Precisa Melhorar': 0 };
-  funcionarios.forEach(f => { desempenhoStats[f.desempenho] = (desempenhoStats[f.desempenho] || 0) + 1; });
-  const dataDesempenho = Object.keys(desempenhoStats).map(k => ({ name: k, value: desempenhoStats[k] }));
 
   const diasObras = obras.map(o => ({
     name: o.nome.substring(0, 18),
@@ -97,7 +96,7 @@ export default function Relatorios() {
         {visorModo === 'Lucro' && (
           <div className="flex gap-6" style={{ flexWrap: 'wrap' }}>
             <div className="card flex-1" style={{ minWidth: 340 }}>
-              <h3 style={{ fontWeight: 600, marginBottom: 24 }}>Custo Real vs Valor Proposto</h3>
+              <h3 style={{ fontWeight: 600, marginBottom: 24 }}>Gasto Real vs Valor da PTC</h3>
               <div style={{ height: 300 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={dataLucro}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
@@ -105,8 +104,8 @@ export default function Relatorios() {
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
                     <RTooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: 'var(--shadow-md)' }} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 13 }} />
-                    <Bar dataKey="custo" name="Custo Real" fill="var(--danger)" radius={[4,4,0,0]} />
-                    <Bar dataKey="proposto" name="Valor Proposto" fill="var(--success)" radius={[4,4,0,0]} />
+                    <Bar dataKey="custo" name="Gasto Real" fill="var(--danger)" radius={[4,4,0,0]} />
+                    <Bar dataKey="proposto" name="Valor da PTC" fill="var(--success)" radius={[4,4,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -176,7 +175,7 @@ export default function Relatorios() {
 
         {visorModo === 'Clientes' && (
           <div className="card">
-            <h3 style={{ fontWeight: 600, marginBottom: 20 }}>Top Clientes (Volume de Compras/Propostas)</h3>
+            <h3 style={{ fontWeight: 600, marginBottom: 20 }}>Top Clientes (Volume em PTCs)</h3>
             <div style={{ height: 350 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={topClientes} layout="vertical">
@@ -184,7 +183,7 @@ export default function Relatorios() {
                   <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)' }} />
                   <YAxis dataKey="nome" type="category" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-primary)', fontSize: 12, fontWeight: 500 }} width={160} />
                   <RTooltip formatter={(val) => formatCurrency(val)} />
-                  <Bar dataKey="total" name="Total Proposto" fill="var(--success)" radius={[0,4,4,0]} />
+                  <Bar dataKey="total" name="Total em PTCs" fill="var(--success)" radius={[0,4,4,0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

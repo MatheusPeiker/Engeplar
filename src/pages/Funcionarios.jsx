@@ -6,6 +6,7 @@ import Modal from '../components/Modal';
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { receitaPTC } from '../lib/ptcTotais';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet default marker icons broken by Vite asset handling
@@ -77,7 +78,7 @@ export default function Funcionarios() {
   const {
     funcionarios, addFuncionario, updateFuncionario, deleteFuncionario,
     registrosDesempenho, addRegistroDesempenho,
-    obras, listaOrcamentos, getTotalOrcamento, propostas, formatCurrency
+    obras, ptcs, formatCurrency
   } = useAppContext();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -98,20 +99,28 @@ export default function Funcionarios() {
     o.status === 'Concluída' || o.status === 'Concluido' || o.status === 'Finalizada'
   );
 
+  /* Receita da obra: soma das PTCs vinculadas; sem PTC, o orçamento da obra. */
+  const receitaDaObra = (obraId) => {
+    const dasPtcs = ptcs.filter(p => p.obra_id === obraId).reduce((a, p) => a + receitaPTC(p), 0);
+    if (dasPtcs > 0) return dasPtcs;
+    return obras.find(o => o.id === obraId)?.orcamento || 0;
+  };
+
+  /* Rateio da mão de obra da obra: cada profissional alocado leva a fatia da
+     receita proporcional ao seu custo (diária × dias) dentro da equipe. */
+  const custosDaEquipe = (obraId) => funcionarios
+    .filter(f => f.obraAtualId === obraId)
+    .map(f => ({ id: f.id, nome: f.nome, custo: (f.custoDiaria || 0) * (f.diasTrabalhados || 0) }));
+
   const calcValorGerado = (obraId, funcId) => {
     if (!obraId || !funcId) return null;
-    const obra = obras.find(o => o.id === obraId);
-    const orc = listaOrcamentos.find(lo => lo.obraId === obraId);
-    if (!obra) return null;
-    // Revenue: prefer proposta value, fallback to obra budget
-    const proposta = propostas.find(p => p.obraId === obraId);
-    const receita = proposta?.valorProposto || obra.orcamento || 0;
-    if (!orc) return receita > 0 ? null : 0; // no orçamento → can't split, let user enter manually
-    const empMO = (orc.extras?.maoDeObra || []).find(m => m.funcionarioId === funcId);
-    const empCusto = empMO ? (empMO.diasPrevistos * empMO.custoDiaria) : 0;
-    const totalCusto = getTotalOrcamento(orc.id);
-    if (totalCusto === 0 || receita === 0) return 0;
-    return Math.round((empCusto / totalCusto) * receita * 100) / 100;
+    const receita = receitaDaObra(obraId);
+    const equipe = custosDaEquipe(obraId);
+    const doFunc = equipe.find(e => e.id === funcId);
+    const totalEquipe = equipe.reduce((a, e) => a + e.custo, 0);
+    // Sem alocação ou sem dias lançados não há como ratear: o usuário digita.
+    if (!doFunc || totalEquipe === 0 || receita === 0) return null;
+    return Math.round((doFunc.custo / totalEquipe) * receita * 100) / 100;
   };
 
   const handleObraRegChange = (obraId) => {
@@ -293,21 +302,23 @@ export default function Funcionarios() {
               {obrasConcluidas.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
             </select>
             {obraReg && (() => {
-              const orc = listaOrcamentos.find(lo => lo.obraId === obraReg);
-              const empMO = orc?.extras?.maoDeObra?.find(m => m.funcionarioId === selectedFuncId);
-              const obra = obras.find(o => o.id === obraReg);
-              const proposta = propostas.find(p => p.obraId === obraReg);
-              const receita = proposta?.valorProposto || obra?.orcamento || 0;
-              const totalCusto = orc ? getTotalOrcamento(orc.id) : 0;
-              const empCusto = empMO ? empMO.diasPrevistos * empMO.custoDiaria : 0;
-              const perc = totalCusto > 0 ? ((empCusto / totalCusto) * 100).toFixed(1) : 0;
+              const func = funcionarios.find(f => f.id === selectedFuncId);
+              const equipe = custosDaEquipe(obraReg);
+              const doFunc = equipe.find(e => e.id === selectedFuncId);
+              const totalEquipe = equipe.reduce((a, e) => a + e.custo, 0);
+              const receita = receitaDaObra(obraReg);
+              const perc = totalEquipe > 0 && doFunc ? ((doFunc.custo / totalEquipe) * 100).toFixed(1) : 0;
               return (
                 <div style={{ marginTop: 8, padding: '10px 12px', background: 'var(--primary-light, rgba(37,99,235,0.08))', borderRadius: 8, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  {empMO
-                    ? <><strong>{empMO.diasPrevistos} dias</strong> × {formatCurrency(empMO.custoDiaria)}/dia = <strong>{formatCurrency(empCusto)}</strong> de custo<br />
-                       Representa <strong>{perc}%</strong> do custo total da obra ({formatCurrency(totalCusto)})<br />
+                  {doFunc && totalEquipe > 0 && receita > 0
+                    ? <><strong>{func?.diasTrabalhados || 0} dias</strong> × {formatCurrency(func?.custoDiaria || 0)}/dia = <strong>{formatCurrency(doFunc.custo)}</strong> de custo<br />
+                       Representa <strong>{perc}%</strong> do custo da equipe alocada ({formatCurrency(totalEquipe)})<br />
                        Receita da obra: <strong>{formatCurrency(receita)}</strong> → Valor gerado: <strong style={{ color: 'var(--success)' }}>{formatCurrency(parseFloat(valorReg) || 0)}</strong></>
-                    : <span style={{ color: 'var(--warning)' }}>Funcionário não encontrado no orçamento desta obra. Insira o valor manualmente.</span>
+                    : <span style={{ color: 'var(--warning)' }}>
+                        {!doFunc
+                          ? 'Este profissional não está alocado nesta obra. Insira o valor manualmente.'
+                          : 'Falta receita (PTC vinculada ou orçamento da obra) ou dias trabalhados para ratear. Insira o valor manualmente.'}
+                      </span>
                   }
                 </div>
               );

@@ -6,12 +6,10 @@ import Dashboard from './pages/Dashboard'
 import Obras from './pages/Obras'
 import ObraDetalhes from './pages/ObraDetalhes'
 import Financeiro from './pages/Financeiro'
-import Orcamentos from './pages/Orcamentos'
 import Compras from './pages/Compras'
 import Relatorios from './pages/Relatorios'
 import Funcionarios from './pages/Funcionarios'
 import TabelaPrecos from './pages/TabelaPrecos'
-import Proposta from './pages/Proposta'
 import Cronograma from './pages/Cronograma'
 import Arquivos from './pages/Arquivos'
 import Historico from './pages/Historico'
@@ -43,8 +41,6 @@ function App() {
         <Route path="obras/:id" element={<ObraDetalhes />} />
         <Route path="financeiro" element={<Financeiro />} />
         <Route path="funcionarios" element={<Funcionarios />} />
-        <Route path="orcamentos" element={<Orcamentos />} />
-        <Route path="proposta" element={<Proposta />} />
         <Route path="cronograma" element={<Cronograma />} />
         <Route path="arquivos" element={<Arquivos />} />
         <Route path="compras" element={<Compras />} />

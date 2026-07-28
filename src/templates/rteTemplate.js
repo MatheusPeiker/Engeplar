@@ -25,14 +25,14 @@ import {
  * @param {Object} obra       Dados da obra (com campos RTE)
  * @param {Object} empresa    Dados da empresa
  * @param {Array}  cronograma Etapas do cronograma
- * @param {Object} proposta   Proposta principal vinculada à obra
+ * @param {Object} ptc        PTC vinculada à obra (referência do relatório)
  * @param {Array}  tecnicos   Funcionários alocados na obra
  * @param {Object} fotos      Imagens por seção: { estrutura, 'proc-<i>', procedimento,
  *                            ensaios, final } → [{ src, legenda }]. Grupos vazios
  *                            fazem a seção correspondente não ser impressa.
  * @returns {string}          HTML completo pronto para window.open + print
  */
-export function gerarHTMLRTE(obra, empresa, cronograma = [], proposta = null, tecnicos = [], fotos = {}) {
+export function gerarHTMLRTE(obra, empresa, cronograma = [], ptc = null, tecnicos = [], fotos = {}) {
   // Remove pontuação final para encaixar o texto dentro de uma frase
   const frase = (s) => esc(String(s || '').trim().replace(/[.;,]+$/, ''));
 
@@ -63,8 +63,8 @@ export function gerarHTMLRTE(obra, empresa, cronograma = [], proposta = null, te
   const dim = obra.dimensoes || {};
   const nomeEmpresa = esc(empresa?.nomeFantasia || empresa?.razaoSocial || 'Engeplar');
   const rteNum = esc(obra.rteNumero || 'RTE – ____.__.__ REV00');
-  const ptcRef = esc(proposta?.ptc_numero || proposta?.nome || '___________________');
-  const local = esc(proposta?.clienteEndereco || obra.endereco || '');
+  const ptcRef = esc(ptc?.numero_completo || ptc?.descricao_servico || '___________________');
+  const local = esc(ptc?.cliente_endereco || obra.endereco || '');
 
   const d = obra.dadosRte || {};
 
@@ -381,7 +381,7 @@ table.fotos td:last-child { padding-left: 3mm; }
         ${secao('Proposta Técnica Comercial', `
           <div class="ref-box">
             ${campo('PTC Nº', ptcRef)}
-            ${proposta?.nome ? campo('Descrição', esc(proposta.nome)) : ''}
+            ${ptc?.descricao_servico ? campo('Descrição', esc(ptc.descricao_servico)) : ''}
           </div>
           ${nota('Proposta técnica comercial conforme arquivo aprovado pelo contratante.')}`)}
 

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Clock, RotateCcw, Filter, FileText, DollarSign, Calendar, Users, Building2, ShoppingBag, Package, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Clock, RotateCcw, FileText, DollarSign, Calendar, Users, Building2, ShoppingBag, Package, CheckCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 const MODULO_META = {

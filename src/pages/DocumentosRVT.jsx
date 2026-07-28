@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { FilePlus, FileText, Search, ChevronLeft, Trash2, Eye, Plus, Minus } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { gerarHTMLRVT } from '../templates/rvtTemplate';

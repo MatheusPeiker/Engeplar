@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Calendar, Clock } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import InlineEdit from '../components/InlineEdit';
 

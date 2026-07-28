@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // 'Engeplar' é uma cópia antiga do projeto (repo git aninhado, só com build):
+  // não é código deste app e o bundle minificado quebrava o lint.
+  globalIgnores(['dist', '**/dist/**', 'Engeplar']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

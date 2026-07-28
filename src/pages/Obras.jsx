@@ -1,15 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Plus, Search, MapPin, Trash2, CheckCircle, Clock, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
-const STATUS_ICON = {
-  'Planejamento': <Clock size={13} />,
-  'Em andamento': <Clock size={13} />,
-  'Concluída':    <CheckCircle size={13} />,
-};
 const STATUS_COLOR = {
   'Planejamento': 'var(--text-muted)',
   'Em andamento': 'var(--primary)',

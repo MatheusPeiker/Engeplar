@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Upload, Trash2, FileText, Image, Table, File, Link } from 'lucide-react';
+import { useState } from 'react';
+import { Upload, Trash2, FileText, Image, Table, File } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 const fileIcons = {
@@ -43,9 +43,10 @@ export default function Arquivos() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Arquivos da Obra</h1>
-          <p className="page-subtitle">Gerencie e vincule documentos a etapas, orçamentos e propostas</p>
+          <p className="page-subtitle">Gerencie e vincule documentos às etapas da obra</p>
         </div>
-        <select value={obraSelecionada} onChange={e => setObraSelecionada(parseInt(e.target.value))} style={{ padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 14 }}>
+        {/* O id da obra é UUID: converter para número descartava a seleção */}
+        <select value={obraSelecionada} onChange={e => setObraSelecionada(e.target.value)} style={{ padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 14 }}>
           {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
         </select>
       </div>

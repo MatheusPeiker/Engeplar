@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, AlertCircle, HardHat, Activity, CheckCircle, Circle, Building2, Users, FileText, ShoppingBag, ChevronRight, AlertTriangle } from 'lucide-react';
+import { useMemo } from 'react';
+import { TrendingUp, TrendingDown, DollarSign, AlertCircle, HardHat, Activity, CheckCircle, Circle, ChevronRight, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
@@ -7,16 +7,16 @@ import { useNavigate } from 'react-router-dom';
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 export default function Dashboard() {
-  const { obras, notificacoes, calcProgressoFinanceiro, funcionarios, cronogramas, historico, formatCurrency, empresa, clientes, listaOrcamentos, transacoes } = useAppContext();
+  const { obras, notificacoes, calcProgressoFinanceiro, funcionarios, cronogramas, historico, formatCurrency, empresa, clientes, ptcs, transacoes } = useAppContext();
   const navigate = useNavigate();
 
   // ── Onboarding journey ───────────────────────────────────
   const steps = [
-    { done: !!(empresa?.razaoSocial || empresa?.nomeFantasia), label: 'Cadastrar sua empresa', desc: 'Preencha os dados da sua empresa no Perfil', link: '/perfil', icon: Building2 },
-    { done: funcionarios.length > 0, label: 'Cadastrar sua equipe', desc: 'Adicione seus profissionais e colaboradores', link: '/perfil', icon: Users },
-    { done: clientes.length > 0, label: 'Cadastrar clientes', desc: 'Registre seus primeiros clientes', link: '/contatos', icon: ShoppingBag },
-    { done: listaOrcamentos.length > 0, label: 'Criar um orçamento', desc: 'Monte materiais, mão de obra e mobilização', link: '/orcamentos', icon: FileText },
-    { done: obras.length > 0, label: 'Iniciar uma obra', desc: 'Crie sua primeira obra e acompanhe o progresso', link: '/obras', icon: HardHat },
+    { done: !!(empresa?.razaoSocial || empresa?.nomeFantasia), label: 'Cadastrar sua empresa', desc: 'Preencha os dados da sua empresa no Perfil', link: '/perfil' },
+    { done: funcionarios.length > 0, label: 'Cadastrar sua equipe', desc: 'Adicione seus profissionais e colaboradores', link: '/perfil' },
+    { done: clientes.length > 0, label: 'Cadastrar clientes', desc: 'Registre seus primeiros clientes', link: '/contatos' },
+    { done: ptcs.length > 0, label: 'Criar uma PTC', desc: 'Monte a proposta técnica comercial com materiais, serviços e preços', link: '/ptc' },
+    { done: obras.length > 0, label: 'Iniciar uma obra', desc: 'Crie sua primeira obra e acompanhe o progresso', link: '/obras' },
   ];
   const completedCount = steps.filter(s => s.done).length;
   const showJourney = completedCount < steps.length;
@@ -153,7 +153,6 @@ export default function Dashboard() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {steps.map((s, i) => {
-              const Icon = s.icon;
               return (
                 <div
                   key={i}

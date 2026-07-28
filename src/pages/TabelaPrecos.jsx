@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Plus, Tag, Trash2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
 
 export default function TabelaPrecos() {
-  const { catalogo, addCatalogoItem, updateCatalogoItem, deleteCatalogoItem, formatCurrency } = useAppContext();
+  const { catalogo, addCatalogoItem, updateCatalogoItem, deleteCatalogoItem } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState('Fixo');

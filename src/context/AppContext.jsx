@@ -1,6 +1,7 @@
 import { createContext, useState, useContext, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { geocodeEndereco, FALLBACK_LOCATION } from '../lib/geocode';
+import { receitaPTC } from '../lib/ptcTotais';
 
 const AppContext = createContext();
 
@@ -12,9 +13,6 @@ const ALLOWED_CAMPOS = {
     'nfNumero', 'nfData', 'tipoServico', 'materialEquipamento', 'dimensoes',
     'garantiaMeses', 'inspecaoMeses', 'responsavelCliente', 'descricaoTecnica', 'dadosRte']),
   gasto:       new Set(['descricao', 'valor', 'data', 'categoria']),
-  proposta:    new Set(['nome', 'clienteNome', 'clienteCnpj', 'clienteEndereco', 'margemLucro', 'impostos', 'condicoesPagamento', 'valorProposto', 'observacoes', 'obraId', 'orcamentoId', 'status',
-    'ptcNumero', 'revisao', 'elaboracao', 'visita', 'objetivo', 'prazoExecucao', 'naoIncluso',
-    'notas', 'pagamentoDias', 'validadeDias', 'frete', 'mobilizacaoObs']),
   cronograma:  new Set(['etapa', 'dataInicio', 'dataFim', 'custo', 'progresso', 'cor']),
   funcionario: new Set(['nome', 'funcao', 'custoDiaria', 'diasTrabalhados', 'obraAtualId', 'desempenho']),
   catalogo:    new Set(['nome', 'tipo', 'custo']),
@@ -58,34 +56,6 @@ const norm = {
     custoDiaria: r.custo_diaria ?? 0, diasTrabalhados: r.dias_trabalhados ?? 0,
     obraAtualId: r.obra_atual_id, desempenho: r.desempenho
   }),
-  orcamento: (r) => ({
-    id: r.id, nome: r.nome, obraId: r.obra_id,
-    extras: r.extras || {},
-    itens: (r.orcamento_itens ?? []).map(i => ({
-      id: i.id, descricao: i.descricao, categoria: i.categoria,
-      unidade: i.unidade, quantidade: i.quantidade ?? 1, custoUnitario: i.custo_unitario ?? 0
-    }))
-  }),
-  proposta: (r) => ({
-    id: r.id, nome: r.nome, obraId: r.obra_id, orcamentoId: r.orcamento_id,
-    clienteNome: r.cliente_nome, clienteCnpj: r.cliente_cnpj, clienteEndereco: r.cliente_endereco,
-    margemLucro: r.margem_lucro ?? 20, impostos: r.impostos ?? 6,
-    condicoesPagamento: r.condicoes_pagamento, valorProposto: r.valor_proposto,
-    observacoes: r.observacoes, status: r.status || 'rascunho',
-    // Campos PTC
-    ptcNumero:      r.ptc_numero      ?? '',
-    revisao:        r.revisao         || 'REV00',
-    elaboracao:     r.elaboracao      ?? '',
-    visita:         r.visita          ?? '',
-    objetivo:       r.objetivo        ?? '',
-    prazoExecucao:  r.prazo_execucao  ?? '',
-    naoIncluso:     r.nao_incluso     ?? '',
-    notas:          r.notas           ?? '',
-    pagamentoDias:  r.pagamento_dias  ?? 14,
-    validadeDias:   r.validade_dias   ?? 15,
-    frete:          r.frete           || 'CIF',
-    mobilizacaoObs: r.mobilizacao_obs || 'A combinar',
-  }),
   historico: (r) => ({
     id: r.id, modulo: r.modulo, campo: r.campo,
     anterior: r.anterior, novo: r.novo,
@@ -110,9 +80,7 @@ const norm = {
     inscricaoEstadual: r.inscricao_estadual, endereco: r.endereco,
     telefone: r.telefone, email: r.email, site: r.site, logo: r.logo
   }),
-  ptc: (r) => ({ ...r }),
-  rvt: (r) => ({ ...r }),
-  tipoServico: (r) => ({ ...r }),
+  // PTC e RVT são usados com os nomes de coluna do banco, sem tradução.
 };
 
 const DEFAULT_EMPRESA = {
@@ -140,8 +108,6 @@ export const AppProvider = ({ children }) => {
   const [clientes, setClientes] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
   const [obras, setObras] = useState([]);
-  const [listaOrcamentos, setListaOrcamentos] = useState([]);
-  const [propostas, setPropostas] = useState([]);
   const [cronogramas, setCronogramas] = useState([]);
   const [arquivos, setArquivos] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
@@ -150,11 +116,9 @@ export const AppProvider = ({ children }) => {
   const [transacoes, setTransacoes] = useState([]);
   const [compras, setCompras] = useState([]);
   const [historico, setHistorico] = useState([]);
-  const [versoes, setVersoes] = useState([]);
   // ── Módulo Engeplar Documentos ────────────────────────────
   const [ptcs, setPtcs] = useState([]);
   const [rvts, setRvts] = useState([]);
-  const [tiposServico, setTiposServico] = useState([]);
   const [notificacoes, setNotificacoes] = useState([
     { id: 1, titulo: 'Bem-vindo', descricao: 'Seus dados estão sendo carregados do banco.', lida: false },
   ]);
@@ -182,22 +146,11 @@ export const AppProvider = ({ children }) => {
     return () => { subscription.unsubscribe(); clearTimeout(fallback); };
   }, []);
 
-  // ── Load data on login ────────────────────────────────────
-  useEffect(() => {
-    if (session) {
-      loadAllData(session.user.id);
-    } else if (!authLoading) {
-      clearAllData();
-    }
-  }, [session, authLoading]);
-
   const clearAllData = () => {
     setEmpresa(DEFAULT_EMPRESA); setClientes([]); setFornecedores([]);
-    setObras([]); setListaOrcamentos([]); setPropostas([]);
-    setCronogramas([]); setArquivos([]); setFuncionarios([]);
+    setObras([]); setCronogramas([]); setArquivos([]); setFuncionarios([]);
     setRegistrosDesempenho([]); setCatalogo([]); setTransacoes([]);
-    setCompras([]); setHistorico([]); setVersoes([]);
-    setPtcs([]); setRvts([]); setTiposServico([]);
+    setCompras([]); setHistorico([]); setPtcs([]); setRvts([]);
   };
 
   // Reposiciona as obras cujo lat/lng não corresponde ao endereço atual. Cobre as
@@ -225,16 +178,14 @@ export const AppProvider = ({ children }) => {
   const loadAllData = async (uid) => {
     setDataLoading(true);
     const [
-      obrasRes, clientesRes, fornRes, funcRes, orcRes, propRes,
+      obrasRes, clientesRes, fornRes, funcRes,
       cronRes, arqRes, catRes, transRes, comprasRes, despRes, empresaRes, histRes,
-      ptcRes, rvtRes, tiposServicoRes
+      ptcRes, rvtRes
     ] = await Promise.all([
       supabase.from('obras').select('*, gastos_despesas(*)').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('clientes').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('fornecedores').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('funcionarios').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-      supabase.from('orcamentos').select('*, orcamento_itens(*)').eq('user_id', uid).order('created_at', { ascending: false }),
-      supabase.from('propostas').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('cronogramas').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('arquivos').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('catalogo').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
@@ -245,7 +196,6 @@ export const AppProvider = ({ children }) => {
       supabase.from('historico').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
       supabase.from('ptc').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('rvt').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-      supabase.from('tipos_servico').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     ]);
 
     if (obrasRes.data) {
@@ -255,8 +205,6 @@ export const AppProvider = ({ children }) => {
     if (clientesRes.data) setClientes(clientesRes.data);
     if (fornRes.data)     setFornecedores(fornRes.data);
     if (funcRes.data)     setFuncionarios(funcRes.data.map(norm.funcionario));
-    if (orcRes.data)      setListaOrcamentos(orcRes.data.map(norm.orcamento));
-    if (propRes.data)     setPropostas(propRes.data.map(norm.proposta));
     if (cronRes.data)     setCronogramas(cronRes.data.map(norm.cronograma));
     if (arqRes.data)      setArquivos(arqRes.data.map(norm.arquivo));
     if (catRes.data)      setCatalogo(catRes.data);
@@ -265,12 +213,23 @@ export const AppProvider = ({ children }) => {
     if (despRes.data)     setRegistrosDesempenho(despRes.data.map(norm.desempenho));
     if (empresaRes.data)  setEmpresa(norm.empresa(empresaRes.data));
     if (histRes.data)     setHistorico(histRes.data.map(norm.historico));
-    if (ptcRes.data)      setPtcs(ptcRes.data.map(norm.ptc));
-    if (rvtRes.data)      setRvts(rvtRes.data.map(norm.rvt));
-    if (tiposServicoRes.data) setTiposServico(tiposServicoRes.data.map(norm.tipoServico));
+    if (ptcRes.data)      setPtcs(ptcRes.data);
+    if (rvtRes.data)      setRvts(rvtRes.data);
 
     setDataLoading(false);
   };
+
+  // ── Load data on login ────────────────────────────────────
+  // Declarado depois de loadAllData/clearAllData de propósito: o efeito só roda
+  // após a renderização, e assim ele enxerga sempre a versão atual das funções.
+  useEffect(() => {
+    if (session) {
+      loadAllData(session.user.id);
+    } else if (!authLoading) {
+      clearAllData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, authLoading]);
 
   const uid = () => sessionRef.current?.user?.id;
 
@@ -313,14 +272,6 @@ export const AppProvider = ({ children }) => {
         if (data) setHistorico(prev => prev.map(h => h.id === tempId ? { ...h, id: data.id } : h));
       });
     }
-  }, []);
-
-  const salvarVersao = useCallback((tipo, obraId, dados, nome) => {
-    setVersoes(prev => [{
-      id: Date.now(), tipo, obraId, dados: JSON.parse(JSON.stringify(dados)),
-      nome: nome || `Versão ${prev.filter(v => v.tipo === tipo && v.obraId === obraId).length + 1}`,
-      timestamp: new Date().toISOString()
-    }, ...prev]);
   }, []);
 
   // ── Empresa ───────────────────────────────────────────────
@@ -432,8 +383,9 @@ export const AppProvider = ({ children }) => {
     const obra = obras.find(o => o.id === obraId);
     if (obra) registrarAlteracao('Obras', 'Obra removida', obra.nome, null);
     setObras(prev => prev.filter(o => o.id !== obraId));
-    setListaOrcamentos(prev => prev.map(o => o.obraId === obraId ? { ...o, obraId: null } : o));
-    setPropostas(prev => prev.filter(p => p.obraId !== obraId));
+    // PTC e RVT sobrevivem à obra (DB faz ON DELETE SET NULL): só perdem o vínculo
+    setPtcs(prev => prev.map(p => p.obra_id === obraId ? { ...p, obra_id: null } : p));
+    setRvts(prev => prev.map(r => r.obra_id === obraId ? { ...r, obra_id: null } : r));
     setCronogramas(prev => prev.filter(c => c.obraId !== obraId));
     setArquivos(prev => prev.filter(a => a.obraId !== obraId));
     // Libera funcionários alocados nesta obra no estado local (DB faz ON DELETE SET NULL)
@@ -485,114 +437,6 @@ export const AppProvider = ({ children }) => {
     }));
     await supabase.from('gastos_despesas').delete().eq('id', gastoId).eq('user_id', uid());
   }, [registrarAlteracao]);
-
-  // ── Orçamentos ────────────────────────────────────────────
-  const addOrcamento = async (nome, obraId = null) => {
-    const tempId = `tmp_${Date.now()}`;
-    const local = { id: tempId, nome, obraId, itens: [] };
-    setListaOrcamentos(prev => [...prev, local]);
-    const { data, error } = await supabase.from('orcamentos').insert({ nome, obra_id: obraId || null, user_id: uid() }).select('*, orcamento_itens(*)').single();
-    if (error) { setListaOrcamentos(prev => prev.filter(o => o.id !== tempId)); return tempId; }
-    setListaOrcamentos(prev => prev.map(o => o.id === tempId ? norm.orcamento(data) : o));
-    return data.id;
-  };
-
-  const updateOrcamento = async (orcId, campo, valor) => {
-    setListaOrcamentos(prev => prev.map(o => o.id === orcId ? { ...o, [campo]: valor } : o));
-    const dbMap = { nome: 'nome', obraId: 'obra_id' };
-    await supabase.from('orcamentos').update({ [dbMap[campo] || campo]: valor }).eq('id', orcId).eq('user_id', uid());
-  };
-
-  const deleteOrcamento = async (orcId) => {
-    setListaOrcamentos(prev => prev.filter(o => o.id !== orcId));
-    await supabase.from('orcamentos').delete().eq('id', orcId).eq('user_id', uid());
-  };
-
-  const addOrcamentoItem = async (orcId, item) => {
-    const tempId = `tmp_${Date.now()}`;
-    setListaOrcamentos(prev => prev.map(o => o.id === orcId ? { ...o, itens: [...o.itens, { ...item, id: tempId }] } : o));
-    const { data, error } = await supabase.from('orcamento_itens').insert({
-      orcamento_id: orcId, descricao: item.descricao, categoria: item.categoria,
-      unidade: item.unidade, quantidade: item.quantidade, custo_unitario: item.custoUnitario, user_id: uid()
-    }).select().single();
-    if (error) { setListaOrcamentos(prev => prev.map(o => o.id === orcId ? { ...o, itens: o.itens.filter(i => i.id !== tempId) } : o)); return; }
-    setListaOrcamentos(prev => prev.map(o => o.id === orcId ? {
-      ...o, itens: o.itens.map(i => i.id === tempId ? { id: data.id, descricao: data.descricao, categoria: data.categoria, unidade: data.unidade, quantidade: data.quantidade, custoUnitario: data.custo_unitario } : i)
-    } : o));
-  };
-
-  const updateOrcamentoItem = async (orcId, itemId, campo, valor) => {
-    setListaOrcamentos(prev => prev.map(o => o.id === orcId ? {
-      ...o, itens: o.itens.map(i => i.id === itemId ? { ...i, [campo]: (campo === 'quantidade' || campo === 'custoUnitario') ? parseFloat(valor) || 0 : valor } : i)
-    } : o));
-    const dbMap = { descricao: 'descricao', categoria: 'categoria', unidade: 'unidade', quantidade: 'quantidade', custoUnitario: 'custo_unitario' };
-    await supabase.from('orcamento_itens').update({ [dbMap[campo] || campo]: valor }).eq('id', itemId).eq('user_id', uid());
-  };
-
-  const deleteOrcamentoItem = async (orcId, itemId) => {
-    setListaOrcamentos(prev => prev.map(o => o.id === orcId ? { ...o, itens: o.itens.filter(i => i.id !== itemId) } : o));
-    await supabase.from('orcamento_itens').delete().eq('id', itemId).eq('user_id', uid());
-  };
-
-  const updateOrcamentoExtras = async (orcId, extras) => {
-    setListaOrcamentos(prev => prev.map(o => o.id === orcId ? { ...o, extras } : o));
-    await supabase.from('orcamentos').update({ extras }).eq('id', orcId).eq('user_id', uid());
-  };
-
-  const getOrcamentoObra = (obraId) => {
-    const orc = listaOrcamentos.find(o => o.obraId === obraId);
-    return orc ? orc.itens : [];
-  };
-
-  const getTotalOrcamento = (orcId) => {
-    const orc = listaOrcamentos.find(o => o.id === orcId);
-    if (!orc) return 0;
-    const totalItens = orc.itens.reduce((a, i) => a + (i.quantidade * i.custoUnitario), 0);
-    const totalMO = (orc.extras?.maoDeObra || []).reduce((a, m) => a + (m.custoDiaria || 0) * (m.diasPrevistos || 0), 0);
-    const mob = orc.extras?.mobilizacao || {};
-    const nViagens = parseInt(mob.numViagens) || 1;
-    const totalMob = mob.distanciaKm
-      ? (parseFloat(mob.distanciaKm) * (parseFloat(mob.custoPorKm) || 0) * nViagens)
-        + ((parseInt(mob.numPessoas) || 0) * (parseFloat(mob.custoAdicionalPorPessoa) || 0) * nViagens)
-      : 0;
-    return totalItens + totalMO + totalMob;
-  };
-
-  // ── Propostas ─────────────────────────────────────────────
-  const addProposta = async (nome, obraId = null) => {
-    const tempId = `tmp_${Date.now()}`;
-    const local = { id: tempId, nome, obraId, orcamentoId: null, clienteNome: '', clienteCnpj: '', clienteEndereco: '', margemLucro: 20, impostos: 6, condicoesPagamento: '30 dias', valorProposto: null, observacoes: '', status: 'rascunho' };
-    setPropostas(prev => [local, ...prev]);
-    const { data, error } = await supabase.from('propostas').insert({ nome, obra_id: obraId || null, user_id: uid() }).select().single();
-    if (error) { setPropostas(prev => prev.filter(p => p.id !== tempId)); return tempId; }
-    setPropostas(prev => prev.map(p => p.id === tempId ? norm.proposta(data) : p));
-    return data.id;
-  };
-
-  const getPropostaObra = useCallback((obraId) => propostas.filter(p => p.obraId === obraId), [propostas]);
-
-  const updateProposta = useCallback(async (propostaId, campo, valor) => {
-    setPropostas(prev => prev.map(p => {
-      if (p.id === propostaId) { registrarAlteracao('Proposta', campo, p[campo], valor, p.obraId, propostaId, 'proposta'); return { ...p, [campo]: valor }; }
-      return p;
-    }));
-    const dbMap = {
-      nome: 'nome', obraId: 'obra_id', orcamentoId: 'orcamento_id',
-      clienteNome: 'cliente_nome', clienteCnpj: 'cliente_cnpj', clienteEndereco: 'cliente_endereco',
-      margemLucro: 'margem_lucro', impostos: 'impostos', condicoesPagamento: 'condicoes_pagamento',
-      valorProposto: 'valor_proposto', observacoes: 'observacoes', status: 'status',
-      ptcNumero: 'ptc_numero', revisao: 'revisao', elaboracao: 'elaboracao', visita: 'visita',
-      objetivo: 'objetivo', prazoExecucao: 'prazo_execucao', naoIncluso: 'nao_incluso',
-      notas: 'notas', pagamentoDias: 'pagamento_dias', validadeDias: 'validade_dias',
-      frete: 'frete', mobilizacaoObs: 'mobilizacao_obs',
-    };
-    await supabase.from('propostas').update({ [dbMap[campo] || campo]: valor }).eq('id', propostaId).eq('user_id', uid());
-  }, [registrarAlteracao]);
-
-  const deleteProposta = async (propostaId) => {
-    setPropostas(prev => prev.filter(p => p.id !== propostaId));
-    await supabase.from('propostas').delete().eq('id', propostaId).eq('user_id', uid());
-  };
 
   // ── Cronograma ────────────────────────────────────────────
   const getCronogramaObra = useCallback((obraId) => cronogramas.filter(c => c.obraId === obraId), [cronogramas]);
@@ -677,11 +521,6 @@ export const AppProvider = ({ children }) => {
     setFuncionarios(prev => prev.filter(f => f.id !== funcId));
     await supabase.from('funcionarios').delete().eq('id', funcId).eq('user_id', uid());
   }, [funcionarios, registrarAlteracao]);
-
-  const updateDias = async (funcId, dias) => {
-    setFuncionarios(prev => prev.map(f => f.id === funcId ? { ...f, diasTrabalhados: dias } : f));
-    await supabase.from('funcionarios').update({ dias_trabalhados: dias }).eq('id', funcId).eq('user_id', uid());
-  };
 
   // ── Desempenho ────────────────────────────────────────────
   const addRegistroDesempenho = async (reg) => {
@@ -800,10 +639,21 @@ export const AppProvider = ({ children }) => {
     await supabase.from('ptc').update({ [campo]: valor, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', uid());
   };
 
+  /* Grava vários campos de uma vez (busca por CNPJ, geração de obra). Um único
+     UPDATE evita a corrida de N chamadas paralelas sobrescrevendo umas às outras. */
+  const updatePTCFields = async (id, patch) => {
+    setPtcs(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+    await supabase.from('ptc')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id).eq('user_id', uid());
+  };
+
   const deletePTC = async (id) => {
     setPtcs(prev => prev.filter(p => p.id !== id));
     await supabase.from('ptc').delete().eq('id', id).eq('user_id', uid());
   };
+
+  const getPTCsObra = useCallback((obraId) => ptcs.filter(p => p.obra_id === obraId), [ptcs]);
 
   // ── RVT ───────────────────────────────────────────────────
   const addRVT = async (dados) => {
@@ -826,31 +676,13 @@ export const AppProvider = ({ children }) => {
     await supabase.from('rvt').delete().eq('id', id).eq('user_id', uid());
   };
 
-  // ── Tipos de Serviço ──────────────────────────────────────
-  const addTipoServico = async (dados) => {
-    const tempId = `tmp_${Date.now()}`;
-    setTiposServico(prev => [{ ...dados, id: tempId }, ...prev]);
-    const { data, error } = await supabase.from('tipos_servico').insert({ ...dados, user_id: uid() }).select().single();
-    if (error) { setTiposServico(prev => prev.filter(t => t.id !== tempId)); return null; }
-    setTiposServico(prev => prev.map(t => t.id === tempId ? data : t));
-    return data.id;
-  };
-
-  const updateTipoServico = async (id, campo, valor) => {
-    setTiposServico(prev => prev.map(t => t.id === id ? { ...t, [campo]: valor } : t));
-    await supabase.from('tipos_servico').update({ [campo]: valor }).eq('id', id).eq('user_id', uid());
-  };
-
-  const deleteTipoServico = async (id) => {
-    setTiposServico(prev => prev.filter(t => t.id !== id));
-    await supabase.from('tipos_servico').delete().eq('id', id).eq('user_id', uid());
-  };
-
   // ── Métricas ──────────────────────────────────────────────
+  // Volume por cliente somado das PTCs — a PTC é a origem do valor comercial.
   const getTopClientes = () => {
-    const mapa = propostas.reduce((acc, p) => {
-      const valor = p.valorProposto || (getTotalOrcamento(p.orcamentoId) * (1 + p.margemLucro / 100) * (1 + p.impostos / 100));
-      acc[p.clienteNome] = (acc[p.clienteNome] || 0) + valor;
+    const mapa = ptcs.reduce((acc, p) => {
+      const nome = (p.cliente_nome || '').trim();
+      if (!nome) return acc;
+      acc[nome] = (acc[nome] || 0) + receitaPTC(p);
       return acc;
     }, {});
     return Object.entries(mapa).map(([nome, total]) => ({ nome, total })).sort((a, b) => b.total - a.total);
@@ -896,19 +728,6 @@ export const AppProvider = ({ children }) => {
         setObras(prev => prev.map(o => o.id === alt.obraId
           ? { ...o, gastosDespesas: o.gastosDespesas.map(g => g.id === alt.entityId ? { ...g, [alt.campo]: tv } : g) } : o));
         await supabase.from('gastos_despesas').update({ [dbField]: tv }).eq('id', alt.entityId).eq('user_id', currentUid);
-        break;
-      }
-      case 'proposta': {
-        const dbMap = { clienteNome:'cliente_nome', clienteCnpj:'cliente_cnpj', clienteEndereco:'cliente_endereco', margemLucro:'margem_lucro', impostos:'impostos', condicoesPagamento:'condicoes_pagamento', valorProposto:'valor_proposto', observacoes:'observacoes', obraId:'obra_id', orcamentoId:'orcamento_id', nome:'nome', status:'status',
-          ptcNumero:'ptc_numero', revisao:'revisao', elaboracao:'elaboracao', visita:'visita',
-          objetivo:'objetivo', prazoExecucao:'prazo_execucao', naoIncluso:'nao_incluso',
-          notas:'notas', pagamentoDias:'pagamento_dias', validadeDias:'validade_dias',
-          frete:'frete', mobilizacaoObs:'mobilizacao_obs' };
-        const dbField = dbMap[alt.campo];
-        if (!dbField) return;
-        const tv = ['margemLucro','impostos','valorProposto'].includes(alt.campo) && !isNaN(valNum) ? valNum : val;
-        setPropostas(prev => prev.map(p => p.id === alt.entityId ? { ...p, [alt.campo]: tv } : p));
-        await supabase.from('propostas').update({ [dbField]: tv }).eq('id', alt.entityId).eq('user_id', currentUid);
         break;
       }
       case 'cronograma': {
@@ -967,22 +786,18 @@ export const AppProvider = ({ children }) => {
       clientes, addCliente, updateCliente, deleteCliente,
       fornecedores, addFornecedor, updateFornecedor, deleteFornecedor,
       obras, addObra, updateObra, deleteObra, addGastoDaObra, updateGasto, deleteGasto, calcProgressoFinanceiro,
-      listaOrcamentos, addOrcamento, updateOrcamento, deleteOrcamento, addOrcamentoItem, updateOrcamentoItem, deleteOrcamentoItem, updateOrcamentoExtras, getOrcamentoObra, getTotalOrcamento,
-      propostas, getPropostaObra, updateProposta, addProposta, deleteProposta,
       cronogramas, getCronogramaObra, addEtapaCronograma, updateEtapaCronograma, deleteEtapaCronograma,
       arquivos, getArquivosObra, addArquivo, deleteArquivo,
-      funcionarios, addFuncionario, updateFuncionario, deleteFuncionario, updateDias,
+      funcionarios, addFuncionario, updateFuncionario, deleteFuncionario,
       registrosDesempenho, addRegistroDesempenho, updateRegistroDesempenho, deleteRegistroDesempenho, getDesempenhoFuncionario,
       getTopClientes, getTopFornecedores,
       catalogo, addCatalogoItem, updateCatalogoItem, deleteCatalogoItem,
       transacoes, addTransacao, updateTransacao, deleteTransacao,
       compras, addCompra, updateCompra, deleteCompra,
-      ptcs, addPTC, updatePTC, deletePTC,
+      ptcs, addPTC, updatePTC, updatePTCFields, deletePTC, getPTCsObra,
       rvts, addRVT, updateRVT, deleteRVT,
-      tiposServico, addTipoServico, updateTipoServico, deleteTipoServico,
       notificacoes, marcarComoLida, getNotificacoesNaoLidas,
       historico, registrarAlteracao, reverterAlteracao,
-      versoes, salvarVersao,
       formatCurrency, formatDate
     }}>
       {children}

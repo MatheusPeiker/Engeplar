@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Saída do verify_print.mjs (regenerável)
+verify_rte_output.html
+verify_screenshots/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
