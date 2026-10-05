@@ -58,6 +58,24 @@ CREATE POLICY "rte_user_policy" ON rte
   WITH CHECK (auth.uid() = user_id);
 
 -- ── Migra os RTEs que já foram preenchidos dentro das obras ──
+-- Garante as colunas antigas do RTE em obras: nem todo banco rodou o
+-- schema_v5_rte.sql inteiro, e o INSERT abaixo falharia sem elas.
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS rte_numero            TEXT    DEFAULT '';
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS pedido_numero         TEXT    DEFAULT '';
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS pedido_data           DATE;
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS art_numero            TEXT    DEFAULT '';
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS art_data              DATE;
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS nf_numero             TEXT    DEFAULT '';
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS nf_data               DATE;
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS tipo_servico          TEXT    DEFAULT '';
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS material_equipamento  TEXT    DEFAULT '';
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS dimensoes             JSONB   DEFAULT '{"diametro":"","altura":"","area":""}';
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS garantia_meses        INTEGER DEFAULT 36;
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS inspecao_meses        INTEGER DEFAULT 12;
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS responsavel_cliente   TEXT    DEFAULT '';
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS descricao_tecnica     TEXT    DEFAULT '';
+ALTER TABLE obras ADD COLUMN IF NOT EXISTS dados_rte             JSONB   DEFAULT '{}';
+
 INSERT INTO rte (
   user_id, obra_id, numero_completo, tipo_servico, dados_rte,
   cliente_nome, local, responsavel_cliente,
