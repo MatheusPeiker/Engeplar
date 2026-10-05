@@ -22,7 +22,10 @@ import {
  * ./documentoBase — a mesma usada pela PTC, para os dois documentos terem
  * exatamente a mesma aparência.
  *
- * @param {Object} obra       Dados da obra (com campos RTE)
+ * @param {Object} obra       Dados do RTE no formato de obra (ver montarDocRTE em
+ *                            pages/DocumentosRTE.jsx). periodoInicio/periodoFim e
+ *                            dataEmissao, quando informados, têm prioridade sobre
+ *                            o cronograma e a data de hoje.
  * @param {Object} empresa    Dados da empresa
  * @param {Array}  cronograma Etapas do cronograma
  * @param {Object} ptc        PTC vinculada à obra (referência do relatório)
@@ -52,13 +55,15 @@ export function gerarHTMLRTE(obra, empresa, cronograma = [], ptc = null, tecnico
     } catch { return String(d); }
   };
 
-  const hoje = fmt(new Date().toISOString().split('T')[0]);
+  const hoje = fmt(obra.dataEmissao || new Date().toISOString().split('T')[0]);
 
-  // Datas período de trabalho via cronograma
+  // Período de trabalho: o informado no RTE, senão o do cronograma da obra
   const datasEtapas = cronograma.filter(e => e.dataInicio).map(e => e.dataInicio).sort();
   const datasEtapasFim = cronograma.filter(e => e.dataFim).map(e => e.dataFim).sort();
-  const periodoInicio = datasEtapas.length > 0 ? fmt(datasEtapas[0]) : '___/___/______';
-  const periodoFim = datasEtapasFim.length > 0 ? fmt(datasEtapasFim[datasEtapasFim.length - 1]) : '___/___/______';
+  const periodoInicio = obra.periodoInicio ? fmt(obra.periodoInicio)
+    : datasEtapas.length > 0 ? fmt(datasEtapas[0]) : '___/___/______';
+  const periodoFim = obra.periodoFim ? fmt(obra.periodoFim)
+    : datasEtapasFim.length > 0 ? fmt(datasEtapasFim[datasEtapasFim.length - 1]) : '___/___/______';
 
   const dim = obra.dimensoes || {};
   const nomeEmpresa = esc(empresa?.nomeFantasia || empresa?.razaoSocial || 'Engeplar');

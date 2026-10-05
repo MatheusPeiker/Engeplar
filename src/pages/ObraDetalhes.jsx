@@ -4,48 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { ArrowLeft, Plus, Trash2, MapPin, Calendar, FileText, Users, UserPlus, UserMinus, CheckCircle, AlertCircle, BookMarked, ClipboardList } from 'lucide-react';
 import InlineEdit from '../components/InlineEdit';
 import Modal from '../components/Modal';
-import { gerarHTMLRTE } from '../templates/rteTemplate';
 import { receitaPTC } from '../lib/ptcTotais';
-import { empresaParaImpressao } from '../lib/logo';
-import ModalFotosRelatorio from '../components/ModalFotosRelatorio';
-
-// Componentes fora do render para evitar remount e perda de foco nos inputs
-const RteRow = ({ children }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>{children}</div>
-);
-
-const RteField = ({ label, children }) => (
-  <div>
-    <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600 }}>{label}</label>
-    {children}
-  </div>
-);
-
-const RteSelectOther = ({ value, onChange, options, style, placeholder }) => {
-  const [showInput, setShowInput] = useState(() => !!(value && !options.includes(value)));
-  const handleSelect = (e) => {
-    if (e.target.value === '__outro__') { setShowInput(true); onChange(''); }
-    else { setShowInput(false); onChange(e.target.value); }
-  };
-  const isCustom = showInput || !!(value && !options.includes(value));
-  return (
-    <div>
-      <select style={style} value={isCustom ? '__outro__' : (value || '')} onChange={handleSelect}>
-        <option value="">— Selecionar —</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-        <option value="__outro__">Outro...</option>
-      </select>
-      {isCustom && (
-        <input
-          style={{ ...style, marginTop: 6 }}
-          placeholder={placeholder || 'Especificar...'}
-          value={value || ''}
-          onChange={e => onChange(e.target.value)}
-        />
-      )}
-    </div>
-  );
-};
 
 export default function ObraDetalhes() {
   const { id } = useParams();
@@ -58,7 +17,8 @@ export default function ObraDetalhes() {
     getArquivosObra, addArquivo, deleteArquivo,
     getPTCsObra,
     funcionarios, updateFuncionario,
-    formatCurrency, empresa
+    rtes,
+    formatCurrency
   } = useAppContext();
 
   const obra = obras.find(o => o.id === id);
@@ -67,10 +27,6 @@ export default function ObraDetalhes() {
   const [descGasto, setDescGasto] = useState('');
   const [valorGasto, setValorGasto] = useState('');
   const [dataGasto, setDataGasto] = useState('');
-
-  // Imagens do RTE — anexadas na hora de gerar, não persistidas no banco
-  const [isFotosRteModal, setIsFotosRteModal] = useState(false);
-  const [fotosRte, setFotosRte] = useState({});
 
   // Finalizar obra
   const [isFinalizarModal, setIsFinalizarModal] = useState(false);
@@ -87,8 +43,7 @@ export default function ObraDetalhes() {
   const arquivos = getArquivosObra(id);
   const ptcsDaObra = getPTCsObra(id);
   const totalPtcs = ptcsDaObra.reduce((a, p) => a + receitaPTC(p), 0);
-  // A PTC vinculada é a referência técnica/comercial do RTE
-  const ptcReferencia = ptcsDaObra[0] || null;
+  const rtesDaObra = rtes.filter(r => r.obra_id === id);
   const progressoCrono = cronograma.length > 0 ? Math.round(cronograma.reduce((a, e) => a + e.progresso, 0) / cronograma.length) : 0;
   const equipeObra = funcionarios.filter(f => f.obraAtualId === id);
   const funcionariosSemObra = funcionarios.filter(f => !f.obraAtualId || f.obraAtualId !== id);
@@ -198,8 +153,8 @@ export default function ObraDetalhes() {
 
       {/* Tabs */}
       <div className="tabs-container">
-        {['resumo', 'equipe', 'gastos', 'cronograma', 'arquivos', 'rte'].map(t => (
-          <button key={t} className={`tab-btn ${aba === t ? 'active' : ''}`} onClick={() => setAba(t)} style={{ textTransform: t === 'rte' ? 'uppercase' : 'capitalize' }}>{t}</button>
+        {['resumo', 'equipe', 'gastos', 'cronograma', 'arquivos'].map(t => (
+          <button key={t} className={`tab-btn ${aba === t ? 'active' : ''}`} onClick={() => setAba(t)} style={{ textTransform: 'capitalize' }}>{t}</button>
         ))}
       </div>
 
@@ -250,6 +205,12 @@ export default function ObraDetalhes() {
               <p className="text-muted" style={{ fontSize: 12 }}>
                 {ptcsDaObra.length} {ptcsDaObra.length === 1 ? 'PTC vinculada' : 'PTCs vinculadas'}
                 {ptcsDaObra.length > 0 ? ` · ${formatCurrency(totalPtcs)}` : ''}
+              </p>
+            </div>
+            <div className="card" style={{ padding: 16, cursor: 'pointer' }} onClick={() => navigate('/rte')}>
+              <div className="flex items-center gap-2 mb-2"><ClipboardList size={16} color="var(--primary)" /><span style={{ fontWeight: 600, fontSize: 14 }}>RTEs</span></div>
+              <p className="text-muted" style={{ fontSize: 12 }}>
+                {rtesDaObra.length} {rtesDaObra.length === 1 ? 'RTE vinculado' : 'RTEs vinculados'}
               </p>
             </div>
             <div className="card" style={{ padding: 16, cursor: 'pointer' }} onClick={() => setAba('cronograma')}>
@@ -457,341 +418,6 @@ export default function ObraDetalhes() {
           </div>
         </div>
       )}
-
-      {/* === RTE === */}
-      {aba === 'rte' && (() => {
-        const dim = obra.dimensoes || {};
-        const TIPOS_SERVICO = [
-          { value: 'RECUPERACAO_LINER',           label: 'Recuperação de Liner Interno/Externo (PRFV)' },
-          { value: 'REVESTIMENTO_PINTURA',        label: 'Tratamento e Pintura Anticorrosiva' },
-          { value: 'REVESTIMENTO_IMPERMEABILIZANTE', label: 'Revestimento Impermeabilizante' },
-          { value: 'INJECAO_QUIMICA',             label: 'Injeção Química em Trincas/Fissuras' },
-          { value: 'SOLDA_PLASTICA',              label: 'Solda Plástica por Termofusão (PP/PRFV)' },
-          { value: 'CONSTRUCAO',                  label: 'Construção de Estrutura Nova' },
-        ];
-
-        const fieldStyle = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, outline: 'none', background: 'var(--surface)' };
-        const labelStyle = { display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600 };
-        const gridStyle = { display: 'grid', gap: 16 };
-
-        const handleDim = (key, val) => {
-          updateObra(id, 'dimensoes', { ...dim, [key]: val });
-        };
-
-        const rteData = obra.dadosRte || {};
-        const handleRteField = (key, val) => {
-          updateObra(id, 'dadosRte', { ...rteData, [key]: val });
-        };
-
-        const sectionTitleStyle = { fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-muted)', marginBottom: 16 };
-
-        const renderCamposTipo = () => {
-          if (!obra.tipoServico) return null;
-          const tipoLabel = TIPOS_SERVICO.find(t => t.value === obra.tipoServico)?.label || obra.tipoServico;
-
-          const inp = (key, placeholder = '') => (
-            <input style={fieldStyle} placeholder={placeholder} value={rteData[key] || ''} onChange={e => handleRteField(key, e.target.value)} />
-          );
-          const num = (key, placeholder = '') => (
-            <input type="number" style={fieldStyle} placeholder={placeholder} value={rteData[key] || ''} onChange={e => handleRteField(key, e.target.value)} />
-          );
-          const ta = (key, rows = 3) => (
-            <textarea rows={rows} style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }} value={rteData[key] || ''} onChange={e => handleRteField(key, e.target.value)} />
-          );
-          const chk = (key, label) => (
-            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-              <input type="checkbox" checked={!!rteData[key]} onChange={e => handleRteField(key, e.target.checked)} style={{ width: 15, height: 15 }} />
-              {label}
-            </label>
-          );
-          const sel = (key, options, placeholder) => (
-            <RteSelectOther value={rteData[key] || ''} onChange={val => handleRteField(key, val)} options={options} style={fieldStyle} placeholder={placeholder} />
-          );
-
-          const SIST_APL   = ['Airless', 'Broxa', 'Rolo', 'Pistola convencional', 'Rolo de lã'];
-          const NORMA_JATO = ['Sa 2½ ISO 8501-1', 'Sa 3 ISO 8501-1', 'St 3 SSPC-SP 3', 'SP 6 SSPC-SP 6'];
-
-          switch (obra.tipoServico) {
-            case 'REVESTIMENTO_PINTURA':
-              return (
-                <div className="card">
-                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
-                  <RteRow>
-                    <RteField label="Produto / Sistema">{inp('produto_nome')}</RteField>
-                    <RteField label="Fabricante">{inp('fabricante')}</RteField>
-                    <RteField label="Norma de Preparo de Superfície">{sel('norma_jato', NORMA_JATO)}</RteField>
-                    <RteField label="Sistema de Aplicação">{sel('sistema_aplicacao', SIST_APL)}</RteField>
-                  </RteRow>
-                  <p style={{ ...labelStyle, marginTop: 16, marginBottom: 10 }}>Camadas de Tinta</p>
-                  {[1, 2, 3].map(n => (
-                    <div key={n} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 12, marginBottom: 8, padding: '10px 12px', background: 'var(--background)', borderRadius: 8 }}>
-                      <RteField label={`Camada ${n} — Material/Produto`}>{inp(`camada_${n}_material`)}</RteField>
-                      <RteField label="Cor">{inp(`camada_${n}_cor`)}</RteField>
-                      <RteField label="Esp. Úmida (µm)">{num(`camada_${n}_esp_umida`)}</RteField>
-                      <RteField label="Esp. Seca (µm)">{num(`camada_${n}_esp_seca`)}</RteField>
-                    </div>
-                  ))}
-                  <div style={{ marginTop: 8, maxWidth: 220 }}>
-                    <RteField label="Espessura Total Seca (µm)">{num('espessura_total')}</RteField>
-                  </div>
-                </div>
-              );
-
-            case 'REVESTIMENTO_IMPERMEABILIZANTE':
-              return (
-                <div className="card">
-                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
-                  <RteRow>
-                    <RteField label="Produto / Sistema">{inp('produto_nome')}</RteField>
-                    <RteField label="Fabricante">{inp('fabricante')}</RteField>
-                    <RteField label="Sistema de Aplicação">{sel('sistema_aplicacao', SIST_APL)}</RteField>
-                    <RteField label="Espessura Interna (µm)">{num('espessura_interna')}</RteField>
-                    <RteField label="Espessura Externa (µm)">{num('espessura_externa')}</RteField>
-                  </RteRow>
-                </div>
-              );
-
-            case 'RECUPERACAO_LINER':
-              return (
-                <div className="card">
-                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
-                  <RteRow>
-                    <RteField label="Tipo de Manta">{sel('tipo_manta', ['Fibra de vidro 300 g/m²', 'Fibra de vidro 450 g/m²', 'Fibra de vidro 600 g/m²', 'Mat de fibra de vidro', 'Woven roving'])}</RteField>
-                    <RteField label="Resina">{sel('resina', ['Derakane 411-350', 'Derakane 510C-350', 'Éster vinílico', 'Epóxi', 'Poliéster'])}</RteField>
-                    <RteField label="Tratamento Químico">{inp('tratamento_quimico')}</RteField>
-                    <RteField label="Acabamento">{sel('acabamento', ['Gel coat', 'Véu de superfície C', 'Lixado', 'Polido'])}</RteField>
-                    <RteField label="Área Total (m²)">{inp('area_total_m2')}</RteField>
-                  </RteRow>
-                  <p style={{ ...labelStyle, marginTop: 14, marginBottom: 8 }}>Áreas Executadas</p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20 }}>
-                    {[['interno', 'Liner interno'], ['externo', 'Liner externo'], ['estrutural', 'Reforço estrutural'], ['fundo', 'Fundo do equipamento']].map(([k, l]) => chk(k, l))}
-                  </div>
-                </div>
-              );
-
-            case 'INJECAO_QUIMICA':
-              return (
-                <div className="card">
-                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
-                  <RteRow>
-                    <RteField label="Produto Injetado">{sel('produto_injetado', ['Poliuretano flexível', 'Poliuretano rígido', 'Epóxi bicomponente', 'Acrílico expansivo'])}</RteField>
-                    <RteField label="Total de Pontos de Injeção">{num('total_pontos')}</RteField>
-                    <RteField label="Área Recuperada (m²)">{inp('area_recuperada_m2')}</RteField>
-                  </RteRow>
-                  <div style={{ marginTop: 8 }}>
-                    <RteField label="Descrição das Áreas Recuperadas">{ta('descricao_areas', 3)}</RteField>
-                  </div>
-                </div>
-              );
-
-            case 'SOLDA_PLASTICA':
-              return (
-                <div className="card">
-                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
-                  <RteRow>
-                    <RteField label="Material Base">{sel('material_base', ['PP', 'PRFV', 'PEAD', 'PVC', 'ABS'])}</RteField>
-                    <RteField label="Tipo de Solda">{sel('tipo_solda', ['Termofusão', 'Extrusão', 'Topo quente', 'Eletrofusão'])}</RteField>
-                    <RteField label="Área Reparada (m²)">{inp('area_reparada_m2')}</RteField>
-                  </RteRow>
-                  <div style={{ marginTop: 8 }}>
-                    <RteField label="Descrição dos Reparos">{ta('descricao', 3)}</RteField>
-                  </div>
-                </div>
-              );
-
-            case 'CONSTRUCAO':
-              return (
-                <div className="card">
-                  <p style={sectionTitleStyle}>Dados Técnicos — {tipoLabel}</p>
-                  <RteRow>
-                    <RteField label="Material">{inp('material')}</RteField>
-                    <RteField label="Norma Aplicável">{inp('norma', 'NBR XXXX')}</RteField>
-                  </RteRow>
-                  <div style={{ marginTop: 8 }}>
-                    <RteField label="Descrição da Estrutura">{ta('descricao_estrutura', 3)}</RteField>
-                  </div>
-                </div>
-              );
-
-            default:
-              return null;
-          }
-        };
-
-        /* Seções fotográficas do RTE. Grupos sem imagem não são impressos —
-           por isso o anexo é pedido antes de gerar o documento. */
-        const gruposFotosRte = [
-          { id: 'estrutura', titulo: 'Estrutura — condição anterior à intervenção', dica: 'Fotos do equipamento antes do início dos serviços' },
-          ...(cronograma.length > 0
-            ? cronograma.map((e, i) => ({
-                id: `proc-${i}`,
-                titulo: `Procedimento — etapa ${i + 1}: ${e.etapa || 'sem nome'}`,
-                dica: 'Fotos da execução desta etapa',
-              }))
-            : [{ id: 'procedimento', titulo: 'Procedimento — etapas de execução', dica: 'Cadastre o cronograma para separar as fotos por etapa' }]),
-          { id: 'ensaios', titulo: 'Ensaios e testes', dica: 'Fotos dos ensaios e medições realizados' },
-          { id: 'final', titulo: 'Imagens do equipamento — condição final', dica: 'Fotos após a conclusão dos serviços' },
-        ];
-
-        const gerarRTE = async () => {
-          // Abre a janela no clique (evita bloqueio de pop-up) e só depois valida a logo
-          const w = window.open('', '_blank');
-          const empresaImpressao = await empresaParaImpressao(empresa);
-          const html = gerarHTMLRTE(obra, empresaImpressao, cronograma, ptcReferencia, equipeObra, fotosRte);
-          if (w) { w.document.write(html); w.document.close(); }
-        };
-
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-            {/* Gerar RTE */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ fontWeight: 700, fontSize: 16 }}>RTE — Relatório Técnico de Execução</h3>
-                <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
-                  Preencha os campos abaixo; ao gerar, o sistema pede as imagens de cada seção.
-                  Seções sem imagem não entram no documento.
-                </p>
-              </div>
-              <button className="btn btn-primary" onClick={() => setIsFotosRteModal(true)} style={{ whiteSpace: 'nowrap' }}>
-                <ClipboardList size={15} /> Gerar RTE (PDF)
-              </button>
-            </div>
-
-            <ModalFotosRelatorio
-              isOpen={isFotosRteModal}
-              onClose={() => setIsFotosRteModal(false)}
-              titulo="Imagens do RTE"
-              rotuloGerar="Gerar RTE (PDF)"
-              grupos={gruposFotosRte}
-              fotos={fotosRte}
-              setFotos={setFotosRte}
-              onGerar={() => { setIsFotosRteModal(false); gerarRTE(); }}
-            />
-
-            {/* Bloco: Identificação */}
-            <div className="card">
-              <p style={sectionTitleStyle}>Identificação do Documento</p>
-              <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-                <div>
-                  <label style={labelStyle}>Nº RTE</label>
-                  <input
-                    style={fieldStyle} placeholder="RTE-0000.MM.AA REV00"
-                    value={obra.rteNumero || ''}
-                    onChange={e => updateObra(id, 'rteNumero', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Tipo de Serviço</label>
-                  <select
-                    style={fieldStyle}
-                    value={obra.tipoServico || ''}
-                    onChange={e => updateObra(id, 'tipoServico', e.target.value)}
-                  >
-                    <option value="">— Selecionar —</option>
-                    {TIPOS_SERVICO.map(t => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Dados técnicos dinâmicos por tipo de serviço */}
-            {renderCamposTipo()}
-
-            {/* Bloco: Dados Fiscais */}
-            <div className="card">
-              <p style={sectionTitleStyle}>Dados Fiscais</p>
-              <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                <div>
-                  <label style={labelStyle}>Pedido Nº</label>
-                  <input style={fieldStyle} value={obra.pedidoNumero || ''} onChange={e => updateObra(id, 'pedidoNumero', e.target.value)} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Data do Pedido</label>
-                  <input type="date" style={fieldStyle} value={obra.pedidoData || ''} onChange={e => updateObra(id, 'pedidoData', e.target.value)} />
-                </div>
-                <div>
-                  <label style={labelStyle}>ART Nº</label>
-                  <input style={fieldStyle} value={obra.artNumero || ''} onChange={e => updateObra(id, 'artNumero', e.target.value)} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Data da ART</label>
-                  <input type="date" style={fieldStyle} value={obra.artData || ''} onChange={e => updateObra(id, 'artData', e.target.value)} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Nota Fiscal Nº</label>
-                  <input style={fieldStyle} value={obra.nfNumero || ''} onChange={e => updateObra(id, 'nfNumero', e.target.value)} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Data da NF</label>
-                  <input type="date" style={fieldStyle} value={obra.nfData || ''} onChange={e => updateObra(id, 'nfData', e.target.value)} />
-                </div>
-              </div>
-              {ptcReferencia && (
-                <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--background)', borderRadius: 8, fontSize: 13 }}>
-                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>PTC Referência: </span>
-                  <span>{ptcReferencia.numero_completo || ptcReferencia.descricao_servico || 'PTC sem número'}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Bloco: Equipamento */}
-            <div className="card">
-              <p style={sectionTitleStyle}>Equipamento</p>
-              <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Material / Tipo do Equipamento</label>
-                  <input style={fieldStyle} placeholder="Ex: AÇO CARBONO, PRFV, CONCRETO" value={obra.materialEquipamento || ''} onChange={e => updateObra(id, 'materialEquipamento', e.target.value)} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Diâmetro</label>
-                  <input style={fieldStyle} placeholder="Ex: 3.000 mm" value={dim.diametro || ''} onChange={e => handleDim('diametro', e.target.value)} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Altura</label>
-                  <input style={fieldStyle} placeholder="Ex: 8.500 mm" value={dim.altura || ''} onChange={e => handleDim('altura', e.target.value)} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Área (m²)</label>
-                  <input style={fieldStyle} placeholder="Ex: 85,00" value={dim.area || ''} onChange={e => handleDim('area', e.target.value)} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Responsável do Cliente (acompanhante)</label>
-                  <input style={fieldStyle} placeholder="Nome e cargo" value={obra.responsavelCliente || ''} onChange={e => updateObra(id, 'responsavelCliente', e.target.value)} />
-                </div>
-              </div>
-            </div>
-
-            {/* Bloco: Garantia e Descrição */}
-            <div className="card">
-              <p style={sectionTitleStyle}>Garantia e Descrição Técnica</p>
-              <div style={{ ...gridStyle, gridTemplateColumns: '1fr 1fr' }}>
-                <div>
-                  <label style={labelStyle}>Prazo de Garantia (meses)</label>
-                  <input type="number" min="1" style={fieldStyle} value={obra.garantiaMeses ?? 36} onChange={e => updateObra(id, 'garantiaMeses', parseInt(e.target.value) || 36)} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Periodicidade de Inspeção (meses)</label>
-                  <input type="number" min="1" style={fieldStyle} value={obra.inspecaoMeses ?? 12} onChange={e => updateObra(id, 'inspecaoMeses', parseInt(e.target.value) || 12)} />
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Descrição Técnica do Serviço (texto da Introdução)</label>
-                  <textarea
-                    rows={4}
-                    style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }}
-                    placeholder="Descreva o serviço executado conforme o RTE..."
-                    value={obra.descricaoTecnica || ''}
-                    onChange={e => updateObra(id, 'descricaoTecnica', e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-          </div>
-        );
-      })()}
 
       {/* Modal: Finalizar Obra */}
       <Modal isOpen={isFinalizarModal} onClose={() => setIsFinalizarModal(false)} title="Finalizar Obra">

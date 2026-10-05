@@ -18,6 +18,7 @@ import Perfil from './pages/Perfil'
 import Contatos from './pages/Contatos'
 import DocumentosPTC from './pages/DocumentosPTC'
 import DocumentosRVT from './pages/DocumentosRVT'
+import DocumentosRTE from './pages/DocumentosRTE'
 import RedefinirSenha from './pages/RedefinirSenha'
 
 const ProtectedRoute = ({ children }) => {
@@ -51,6 +52,7 @@ function App() {
         <Route path="contatos" element={<Contatos />} />
         <Route path="ptc" element={<DocumentosPTC />} />
         <Route path="rvt" element={<DocumentosRVT />} />
+        <Route path="rte" element={<DocumentosRTE />} />
       </Route>
     </Routes>
   )

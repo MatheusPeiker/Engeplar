@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, HardHat, FileText, Wallet, ShoppingCart, BarChart3, Users, Menu, Bell, Search, Settings, LogOut, Check, History, Contact2, BookMarked, Microscope } from 'lucide-react';
+import { LayoutDashboard, HardHat, FileText, Wallet, ShoppingCart, BarChart3, Users, Menu, Bell, Search, Settings, LogOut, Check, History, Contact2, BookMarked, Microscope, ClipboardList } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import logoImg from '../../assets/logo.jpeg';
 import Modal from '../Modal';
@@ -8,16 +8,17 @@ import './Layout.css';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-  { icon: HardHat, label: 'Obras', path: '/obras' },
+  { icon: BookMarked, label: 'PTCs', path: '/ptc' },
+  { icon: ClipboardList, label: 'RTEs', path: '/rte' },
+  { icon: Microscope, label: 'RVTs', path: '/rvt' },
+  { icon: HardHat, label: 'Obras', path: '/obras', divider: true },
   { icon: Wallet, label: 'Financeiro', path: '/financeiro' },
   { icon: Users, label: 'Equipe', path: '/funcionarios' },
   { icon: Contact2, label: 'Contatos', path: '/contatos' },
-  { icon: BookMarked, label: 'PTCs', path: '/ptc' },
   { icon: ShoppingCart, label: 'Compras', path: '/compras' },
   { icon: FileText, label: 'Catálogo', path: '/catalogo' },
   { icon: BarChart3, label: 'Relatórios', path: '/relatorios' },
   { icon: History, label: 'Histórico', path: '/historico' },
-  { icon: Microscope, label: 'RVTs', path: '/rvt', divider: true },
 ];
 
 export default function AppLayout() {

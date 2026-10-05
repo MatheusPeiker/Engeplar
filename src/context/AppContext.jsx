@@ -80,7 +80,7 @@ const norm = {
     inscricaoEstadual: r.inscricao_estadual, endereco: r.endereco,
     telefone: r.telefone, email: r.email, site: r.site, logo: r.logo
   }),
-  // PTC e RVT são usados com os nomes de coluna do banco, sem tradução.
+  // PTC, RVT e RTE são usados com os nomes de coluna do banco, sem tradução.
 };
 
 const DEFAULT_EMPRESA = {
@@ -119,6 +119,9 @@ export const AppProvider = ({ children }) => {
   // ── Módulo Engeplar Documentos ────────────────────────────
   const [ptcs, setPtcs] = useState([]);
   const [rvts, setRvts] = useState([]);
+  const [rtes, setRtes] = useState([]);
+  // false quando a tabela rte ainda não foi criada (schema_v9_rte_avulso.sql)
+  const [rteDisponivel, setRteDisponivel] = useState(true);
   const [notificacoes, setNotificacoes] = useState([
     { id: 1, titulo: 'Bem-vindo', descricao: 'Seus dados estão sendo carregados do banco.', lida: false },
   ]);
@@ -150,7 +153,7 @@ export const AppProvider = ({ children }) => {
     setEmpresa(DEFAULT_EMPRESA); setClientes([]); setFornecedores([]);
     setObras([]); setCronogramas([]); setArquivos([]); setFuncionarios([]);
     setRegistrosDesempenho([]); setCatalogo([]); setTransacoes([]);
-    setCompras([]); setHistorico([]); setPtcs([]); setRvts([]);
+    setCompras([]); setHistorico([]); setPtcs([]); setRvts([]); setRtes([]);
   };
 
   // Reposiciona as obras cujo lat/lng não corresponde ao endereço atual. Cobre as
@@ -180,7 +183,7 @@ export const AppProvider = ({ children }) => {
     const [
       obrasRes, clientesRes, fornRes, funcRes,
       cronRes, arqRes, catRes, transRes, comprasRes, despRes, empresaRes, histRes,
-      ptcRes, rvtRes
+      ptcRes, rvtRes, rteRes
     ] = await Promise.all([
       supabase.from('obras').select('*, gastos_despesas(*)').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('clientes').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
@@ -196,6 +199,7 @@ export const AppProvider = ({ children }) => {
       supabase.from('historico').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
       supabase.from('ptc').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('rvt').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('rte').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     ]);
 
     if (obrasRes.data) {
@@ -215,6 +219,8 @@ export const AppProvider = ({ children }) => {
     if (histRes.data)     setHistorico(histRes.data.map(norm.historico));
     if (ptcRes.data)      setPtcs(ptcRes.data);
     if (rvtRes.data)      setRvts(rvtRes.data);
+    if (rteRes.data)      setRtes(rteRes.data);
+    setRteDisponivel(!rteRes.error);
 
     setDataLoading(false);
   };
@@ -383,9 +389,10 @@ export const AppProvider = ({ children }) => {
     const obra = obras.find(o => o.id === obraId);
     if (obra) registrarAlteracao('Obras', 'Obra removida', obra.nome, null);
     setObras(prev => prev.filter(o => o.id !== obraId));
-    // PTC e RVT sobrevivem à obra (DB faz ON DELETE SET NULL): só perdem o vínculo
+    // PTC, RVT e RTE sobrevivem à obra (DB faz ON DELETE SET NULL): só perdem o vínculo
     setPtcs(prev => prev.map(p => p.obra_id === obraId ? { ...p, obra_id: null } : p));
     setRvts(prev => prev.map(r => r.obra_id === obraId ? { ...r, obra_id: null } : r));
+    setRtes(prev => prev.map(r => r.obra_id === obraId ? { ...r, obra_id: null } : r));
     setCronogramas(prev => prev.filter(c => c.obraId !== obraId));
     setArquivos(prev => prev.filter(a => a.obraId !== obraId));
     // Libera funcionários alocados nesta obra no estado local (DB faz ON DELETE SET NULL)
@@ -676,6 +683,31 @@ export const AppProvider = ({ children }) => {
     await supabase.from('rvt').delete().eq('id', id).eq('user_id', uid());
   };
 
+  // ── RTE ───────────────────────────────────────────────────
+  const addRTE = async (dados) => {
+    const tempId = `tmp_${Date.now()}`;
+    const local  = { ...dados, id: tempId, user_id: uid() };
+    setRtes(prev => [local, ...prev]);
+    const { data, error } = await supabase.from('rte').insert({ ...dados, user_id: uid() }).select().single();
+    if (error) {
+      setRtes(prev => prev.filter(r => r.id !== tempId));
+      console.warn('[rte] Execute supabase/schema_v9_rte_avulso.sql no SQL Editor do Supabase.', error.message);
+      return null;
+    }
+    setRtes(prev => prev.map(r => r.id === tempId ? data : r));
+    return data.id;
+  };
+
+  const updateRTE = async (id, campo, valor) => {
+    setRtes(prev => prev.map(r => r.id === id ? { ...r, [campo]: valor } : r));
+    await supabase.from('rte').update({ [campo]: valor, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', uid());
+  };
+
+  const deleteRTE = async (id) => {
+    setRtes(prev => prev.filter(r => r.id !== id));
+    await supabase.from('rte').delete().eq('id', id).eq('user_id', uid());
+  };
+
   // ── Métricas ──────────────────────────────────────────────
   // Volume por cliente somado das PTCs — a PTC é a origem do valor comercial.
   const getTopClientes = () => {
@@ -796,6 +828,7 @@ export const AppProvider = ({ children }) => {
       compras, addCompra, updateCompra, deleteCompra,
       ptcs, addPTC, updatePTC, updatePTCFields, deletePTC, getPTCsObra,
       rvts, addRVT, updateRVT, deleteRVT,
+      rtes, rteDisponivel, addRTE, updateRTE, deleteRTE,
       notificacoes, marcarComoLida, getNotificacoesNaoLidas,
       historico, registrarAlteracao, reverterAlteracao,
       formatCurrency, formatDate
